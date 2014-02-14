@@ -836,8 +836,9 @@ class Display(object):
 					self._get_installed_best(pkg, pkg_info)
 				if ordered and pkg_info.merge and \
 					not pkg_info.attr_display.new:
-					for arg, atom in depgraph._iter_atoms_for_pkg(pkg):
-						if arg.force_reinstall:
+					forced_rebuilds = depgraph._dynamic_config._forced_rebuilds.get(pkg.root, {})
+					for child in forced_rebuilds:
+						if pkg in forced_rebuilds[child]:
 							pkg_info.attr_display.force_reinstall = True
 							break
 
