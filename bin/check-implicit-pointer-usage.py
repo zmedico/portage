@@ -19,10 +19,10 @@ from __future__ import print_function
 import re
 import sys
 
-implicit_pattern = re.compile("([^:]*):(\d+): warning: implicit declaration "
+implicit_pattern = re.compile("([^:]*):(\d+):(?:\d+:)? warning: implicit declaration "
                               + "of function [`']([^']*)'")
 pointer_pattern = (
-    "([^:]*):(\d+): warning: "
+    "([^:]*):(\d+):(?:\d+:)? warning: "
     + "("
     +  "(assignment"
     +  "|initialization"
