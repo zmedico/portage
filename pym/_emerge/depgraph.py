@@ -1604,8 +1604,7 @@ class depgraph(object):
 				new_dep = \
 					self._slot_operator_update_probe_slot_conflict(dep)
 				if new_dep is not None:
-					self._slot_operator_update_backtrack(dep,
-						new_dep=new_dep)
+					self._slot_operator_update_backtrack(dep, new_dep)
 					found_update = True
 
 		return found_update
@@ -1689,35 +1688,16 @@ class depgraph(object):
 
 		self._dynamic_config._need_restart = True
 
-	def _slot_operator_update_backtrack(self, dep, new_child_slot=None,
-		new_dep=None):
-		if new_child_slot is None:
-			child = dep.child
-		else:
-			child = new_child_slot
-		if "--debug" in self._frozen_config.myopts:
-			msg = []
-			msg.append("")
-			msg.append("")
-			msg.append("backtracking due to missed slot abi update:")
-			msg.append("   child package:  %s" % child)
-			if new_child_slot is not None:
-				msg.append("   new child slot package:  %s" % new_child_slot)
-			msg.append("   parent package: %s" % dep.parent)
-			if new_dep is not None:
-				msg.append("   new parent pkg: %s" % new_dep.parent)
-			msg.append("   atom: %s" % dep.atom)
-			msg.append("")
-			writemsg_level("\n".join(msg),
-				noiselevel=-1, level=logging.DEBUG)
+	def _slot_operator_update_backtrack(self, dep, new_dep,
+		new_child_slot=False):
+
 		backtrack_infos = self._dynamic_config._backtrack_infos
 		config = backtrack_infos.setdefault("config", {})
 
 		# mask unwanted binary packages if necessary
 		abi_masks = {}
-		if new_child_slot is None:
-			if not child.installed:
-				abi_masks.setdefault(child, {})["slot_operator_mask_built"] = None
+		if not new_child_slot and not dep.child.installed:
+			abi_masks.setdefault(dep.child, {})["slot_operator_mask_built"] = None
 		if not dep.parent.installed:
 			abi_masks.setdefault(dep.parent, {})["slot_operator_mask_built"] = None
 		if abi_masks:
@@ -1732,13 +1712,31 @@ class depgraph(object):
 				replacement_atom = self._replace_installed_atom(dep.parent)
 			if replacement_atom is not None:
 				abi_reinstalls.add((dep.parent.root, replacement_atom))
-		if new_child_slot is None and child.installed:
-			replacement_atom = self._replace_installed_atom(child)
+		if not new_child_slot and dep.child.installed:
+			replacement_atom = self._replace_installed_atom(dep.child)
 			if replacement_atom is not None:
-				abi_reinstalls.add((child.root, replacement_atom))
+				abi_reinstalls.add((dep.child.root, replacement_atom))
 		if abi_reinstalls:
 			config.setdefault("slot_operator_replace_installed",
 				set()).update(abi_reinstalls)
+
+		if "--debug" in self._frozen_config.myopts:
+			msg = []
+			msg.append("")
+			msg.append("")
+			msg.append("backtracking due to missed slot abi update:")
+			msg.append("   new child slot:  %s" % new_child_slot)
+			msg.append("   existing child package:  %s" % dep.child)
+			msg.append("   existing parent package: %s" % dep.parent)
+			msg.append("   existing atom: %s" % dep.atom)
+			msg.append("   new child package:  %s" % new_dep.child)
+			msg.append("   new parent package: %s" % new_dep.parent)
+			msg.append("   new atom: %s" % new_dep.atom)
+			msg.append("   abi_masks: %s" % (abi_masks,))
+			msg.append("   abi_reinstalls: %s" % (abi_reinstalls,))
+			msg.append("")
+			writemsg_level("\n".join(msg),
+				noiselevel=-1, level=logging.DEBUG)
 
 		self._dynamic_config._need_restart = True
 
@@ -1991,6 +1989,8 @@ class depgraph(object):
 				msg.append("")
 				msg.append("")
 				msg.append("slot_operator_update_probe:")
+				msg.append("   slot conflict:  %s" % slot_conflict)
+				msg.append("   new child slot:  %s" % new_child_slot)
 				msg.append("   existing child package:  %s" % dep.child)
 				msg.append("   existing parent package: %s" % dep.parent)
 				msg.append("   new child package:  %s" % selected[0])
@@ -2281,12 +2281,14 @@ class depgraph(object):
 					new_dep = self._slot_operator_update_probe(dep,
 						new_child_slot=True)
 					if new_dep is not None:
-						self._slot_operator_update_backtrack(dep,
-							new_child_slot=new_dep.child)
+						self._slot_operator_update_backtrack(dep, new_dep,
+							new_child_slot=True)
 
 				if dep.want_update:
-					if self._slot_operator_update_probe(dep):
-						self._slot_operator_update_backtrack(dep)
+					new_dep = self._slot_operator_update_probe(dep)
+					if new_dep is not None:
+						self._slot_operator_update_backtrack(
+							dep, new_dep)
 
 	def _reinstall_for_flags(self, pkg, forced_flags,
 		orig_use, orig_iuse, cur_use, cur_iuse):
