@@ -11,6 +11,7 @@ from portage import _os_merge
 from portage import _unicode_decode
 from portage import _unicode_encode
 from portage.cache.mappings import slot_dict_class
+from portage.dep.soname.parse import parse_soname_deps
 from portage.exception import CommandNotFound, InvalidData
 from portage.localization import _
 from portage.util import getlibpaths
@@ -54,15 +55,18 @@ class LinkageMapELF(object):
 	class _obj_properties_class(object):
 
 		__slots__ = ("arch", "needed", "runpaths", "soname", "alt_paths",
-			"owner",)
+			"owner", "provides", "requires")
 
-		def __init__(self, arch, needed, runpaths, soname, alt_paths, owner):
+		def __init__(self, arch, needed, runpaths, soname, alt_paths, owner,
+			provides, requires):
 			self.arch = arch
 			self.needed = needed
 			self.runpaths = runpaths
 			self.soname = soname
 			self.alt_paths = alt_paths
 			self.owner = owner
+			self.provides = provides
+			self.requires = requires
 
 	def __init__(self, vardbapi):
 		self._dbapi = vardbapi
@@ -225,7 +229,7 @@ class LinkageMapELF(object):
 			for line in grabfile(include_file):
 				lines.append((None, include_file, line))
 
-		aux_keys = [self._needed_aux_key]
+		aux_keys = [self._needed_aux_key, 'PROVIDES', 'REQUIRES']
 		can_lock = os.access(os.path.dirname(self._dbapi._dbroot), os.W_OK)
 		if can_lock:
 			self._dbapi.lock()
@@ -233,10 +237,26 @@ class LinkageMapELF(object):
 			for cpv in self._dbapi.cpv_all():
 				if exclude_pkgs is not None and cpv in exclude_pkgs:
 					continue
+				metadata = dict(zip(aux_keys, self._dbapi.aux_get(cpv, aux_keys)))
+				soname_deps = {}
+
+				for k in ('PROVIDES', 'REQUIRES'):
+					try:
+						soname_deps[k] = frozenset(parse_soname_deps(metadata[k]))
+					except InvalidData as e:
+						soname_deps[k] = None
+						location = self._dbapi.getpath(cpv, filename=k)
+						writemsg_level(_("\nInvalid data in %s: %s\n\n") %
+							(location, e), level=logging.ERROR, noiselevel=-1)
+
+				provides = soname_deps['PROVIDES']
+				requires = soname_deps['REQUIRES']
+
 				needed_file = self._dbapi.getpath(cpv,
 					filename=self._needed_aux_key)
+
 				for line in self._dbapi.aux_get(cpv, aux_keys)[0].splitlines():
-					lines.append((cpv, needed_file, line))
+					lines.append((cpv, provides, requires, needed_file, line))
 		finally:
 			if can_lock:
 				self._dbapi.unlock()
@@ -290,7 +310,8 @@ class LinkageMapELF(object):
 						continue
 					fields[1] = fields[1][root_len:]
 					owner = plibs.pop(fields[1], None)
-					lines.append((owner, "scanelf", ";".join(fields)))
+					lines.append((owner, None, None,
+						"scanelf", ";".join(fields)))
 				proc.wait()
 				proc.stdout.close()
 
@@ -302,13 +323,14 @@ class LinkageMapELF(object):
 			# is important in order to prevent findConsumers from raising
 			# an unwanted KeyError.
 			for x, cpv in plibs.items():
-				lines.append((cpv, "plibs", ";".join(['', x, '', '', ''])))
+				lines.append((cpv, None, None,
+					"plibs", ";".join(['', x, '', '', ''])))
 
 		# Share identical frozenset instances when available,
 		# in order to conserve memory.
 		frozensets = {}
 
-		for owner, location, l in lines:
+		for owner, provides, requires, location, l in lines:
 			l = l.rstrip("\n")
 			if not l:
 				continue
@@ -333,6 +355,10 @@ class LinkageMapELF(object):
 			# as older versions of portage did.
 			arch = entry.multilib_category
 			if arch is None:
+				# This is a legacy entry, so REQUIRES and
+				# PROVIDES are not available.
+				requires = None
+				provides = None
 				arch = _approx_multilib_categories.get(
 					entry.arch, entry.arch)
 
@@ -353,7 +379,8 @@ class LinkageMapELF(object):
 			if myprops is None:
 				indexed = False
 				myprops = self._obj_properties_class(
-					arch, needed, path, soname, [], owner)
+					arch, needed, path, soname, [], owner,
+					provides, requires)
 				obj_properties[obj_key] = myprops
 			# All object paths are added into the obj_properties tuple.
 			myprops.alt_paths.append(obj)
@@ -835,6 +862,7 @@ class LinkageMapELF(object):
 						path_keys = defpath_keys.copy()
 						path_keys.update(self._path_key(x) for x in path)
 						if relevant_dir_keys.intersection(path_keys):
+							# TODO: apply PROVIDES_EXCLUDE and REQUIRES_EXCLUDE
 							satisfied_consumer_keys.add(consumer_key)
 
 		rValue = set()
@@ -847,9 +875,15 @@ class LinkageMapELF(object):
 				if consumer_key in satisfied_consumer_keys:
 					continue
 				consumer_props = self._obj_properties[consumer_key]
+				if self._exclude(obj_props, consumer_props):
+					continue
 				path = consumer_props.runpaths
 				consumer_objs = consumer_props.alt_paths
 				path_keys = defpath_keys.union(self._path_key(x) for x in path)
 				if objs_dir_keys.intersection(path_keys):
 					rValue.update(consumer_objs)
 		return rValue
+
+	@staticmethod
+	def _exclude(provider, consumer):
+		return False
