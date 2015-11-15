@@ -6,6 +6,7 @@ from __future__ import unicode_literals
 import sys
 
 from portage import _encodings, _unicode_encode
+from portage.dep.soname.SonameAtom import SonameAtom
 from portage.exception import InvalidData
 from portage.localization import _
 
@@ -55,6 +56,29 @@ class NeededEntry(object):
 		obj.runpaths = tuple(filter(None, rpaths.split(":")))
 		obj.needed = tuple(filter(None, needed.split(",")))
 
+		return obj
+
+	def intersect_requires(self, requires):
+		"""
+		Return a new instance, filtering out data that does not intersect
+		with the given requires data. This is a convenient way to account
+		for REQUIRES_EXCLUDE, since the intersection operation will filter
+		out anything that REQUIRES_EXCLUDE would exclude.
+
+		@param requires: required soname atoms
+		@type requires: frozenset
+		"""
+		obj = self.__class__()
+		obj.arch = self.arch
+		obj.filename = self.filename
+		obj.multilib_category = self.multilib_category
+		obj.soname = self.soname
+		obj.runpaths = self.runpaths
+		filtered_needed = []
+		for soname in self.needed:
+			if SonameAtom(self.multilib_category, soname) in requires:
+				filtered_needed.append(soname)
+		obj.needed = tuple(filtered_needed)
 		return obj
 
 	def __str__(self):

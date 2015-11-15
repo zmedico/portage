@@ -11,6 +11,8 @@ from portage import _os_merge
 from portage import _unicode_decode
 from portage import _unicode_encode
 from portage.cache.mappings import slot_dict_class
+from portage.dep.soname.parse import parse_soname_deps
+from portage.dep.soname.SonameAtom import SonameAtom
 from portage.exception import CommandNotFound, InvalidData
 from portage.localization import _
 from portage.util import getlibpaths
@@ -225,7 +227,7 @@ class LinkageMapELF(object):
 			for line in grabfile(include_file):
 				lines.append((None, include_file, line))
 
-		aux_keys = [self._needed_aux_key]
+		aux_keys = [self._needed_aux_key, 'PROVIDES', 'REQUIRES']
 		can_lock = os.access(os.path.dirname(self._dbapi._dbroot), os.W_OK)
 		if can_lock:
 			self._dbapi.lock()
@@ -233,10 +235,26 @@ class LinkageMapELF(object):
 			for cpv in self._dbapi.cpv_all():
 				if exclude_pkgs is not None and cpv in exclude_pkgs:
 					continue
+				metadata = dict(zip(aux_keys, self._dbapi.aux_get(cpv, aux_keys)))
+				soname_deps = {}
+
+				for k in ('PROVIDES', 'REQUIRES'):
+					try:
+						soname_deps[k] = frozenset(parse_soname_deps(metadata[k]))
+					except InvalidData as e:
+						soname_deps[k] = None
+						location = self._dbapi.getpath(cpv, filename=k)
+						writemsg_level(_("\nInvalid data in %s: %s\n\n") %
+							(location, e), level=logging.ERROR, noiselevel=-1)
+
+				provides = soname_deps['PROVIDES']
+				requires = soname_deps['REQUIRES']
+
 				needed_file = self._dbapi.getpath(cpv,
 					filename=self._needed_aux_key)
+
 				for line in self._dbapi.aux_get(cpv, aux_keys)[0].splitlines():
-					lines.append((cpv, needed_file, line))
+					lines.append((cpv, provides, requires, needed_file, line))
 		finally:
 			if can_lock:
 				self._dbapi.unlock()
@@ -290,7 +308,8 @@ class LinkageMapELF(object):
 						continue
 					fields[1] = fields[1][root_len:]
 					owner = plibs.pop(fields[1], None)
-					lines.append((owner, "scanelf", ";".join(fields)))
+					lines.append((owner, None, None,
+						"scanelf", ";".join(fields)))
 				proc.wait()
 				proc.stdout.close()
 
@@ -302,13 +321,14 @@ class LinkageMapELF(object):
 			# is important in order to prevent findConsumers from raising
 			# an unwanted KeyError.
 			for x, cpv in plibs.items():
-				lines.append((cpv, "plibs", ";".join(['', x, '', '', ''])))
+				lines.append((cpv, None, None,
+					"plibs", ";".join(['', x, '', '', ''])))
 
 		# Share identical frozenset instances when available,
 		# in order to conserve memory.
 		frozensets = {}
 
-		for owner, location, l in lines:
+		for owner, provides, requires, location, l in lines:
 			l = l.rstrip("\n")
 			if not l:
 				continue
@@ -333,8 +353,24 @@ class LinkageMapELF(object):
 			# as older versions of portage did.
 			arch = entry.multilib_category
 			if arch is None:
+				# This is a legacy entry, so REQUIRES and
+				# PROVIDES are not available.
+				requires = None
+				provides = None
 				arch = _approx_multilib_categories.get(
 					entry.arch, entry.arch)
+
+			if requires is not None:
+				# Apply REQUIRES_EXCLUDE.
+				entry = entry.intersect_requires(requires)
+
+			provides_soname = bool(entry.soname)
+			if provides is not None:
+				# Apply PROVIDES_EXCLUDE.
+				if (entry.soname and
+					entry.multilib_category and SonameAtom(
+					entry.multilib_category, entry.soname) not in provides):
+					provides_soname = False
 
 			obj = entry.filename
 			soname = entry.soname
@@ -369,7 +405,7 @@ class LinkageMapELF(object):
 			if arch_map is None:
 				arch_map = {}
 				libs[arch] = arch_map
-			if soname:
+			if provides_soname:
 				soname_map = arch_map.get(soname)
 				if soname_map is None:
 					soname_map = self._soname_map_class(
