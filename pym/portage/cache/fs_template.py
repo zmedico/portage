@@ -5,10 +5,11 @@
 import os as _os
 import sys
 from portage.cache import template
-from portage import os
+from portage import os, _unicode_encode
 
 from portage.proxy.lazyimport import lazyimport
 lazyimport(globals(),
+	'portage:checksum',
 	'portage.exception:PortageException',
 	'portage.util:apply_permissions,ensure_dirs',
 )
@@ -89,5 +90,12 @@ def gen_label(base, label):
 	label = label.strip("\"").strip("'")
 	label = os.path.join(*(label.rstrip(os.path.sep).split(os.path.sep)))
 	tail = os.path.split(label)[1]
-	return "%s-%X" % (tail, abs(label.__hash__()))
+	if sys.hexversion >= 0x3030000 or os.environ.get("PYTHONHASHSEED") == "random":
+		# Hash randomization makes __hash__() random, so don't use it.
+		hexdigest = checksum._new_md5(_unicode_encode(label)).hexdigest()
+	else:
+		# backward compat
+		hexdigest = "%X" % abs(label.__hash__())
+
+	return "%s-%s" % (tail, hexdigest)
 
