@@ -13,6 +13,12 @@ from portage._global_updates import _do_global_updates
 class MoveEntTestCase(TestCase):
 
 	def testMoveEnt(self):
+		self._testMoveEnt(False)
+
+	def testMoveEntMultiInstance(self):
+		self._testMoveEnt(True)
+
+	def _testMoveEnt(self, multi_instance):
 
 		ebuilds = {
 
@@ -34,10 +40,16 @@ class MoveEntTestCase(TestCase):
 				"SLOT": "2",
 			},
 
+			"dev-libs/A-1::test_repo" : {
+				"EAPI": "4",
+			},
+
+			"old-cat/B-1::test_repo" : {
+				"EAPI": "4",
+			},
 		}
 
 		binpkgs = {
-
 			"dev-libs/A-1::test_repo" : {
 				"EAPI": "4",
 			},
@@ -47,14 +59,26 @@ class MoveEntTestCase(TestCase):
 				"SLOT": "2",
 			},
 
+			"old-cat/B-1::test_repo" : {
+				"EAPI": "4",
+			},
+		}
+
+
+		user_config = {
+			"make.conf":
+				(
+					"FEATURES=\"binpkg-multi-instance\"" if multi_instance else "",
+				),
 		}
 
 		updates = textwrap.dedent("""
 			move dev-libs/A dev-libs/A-moved
+			move old-cat/B new-cat/B
 		""")
 
 		playground = ResolverPlayground(binpkgs=binpkgs,
-			ebuilds=ebuilds, installed=installed)
+			ebuilds=ebuilds, installed=installed, user_config=user_config, debug=True)
 
 		settings = playground.settings
 		trees = playground.trees
@@ -96,6 +120,12 @@ class MoveEntTestCase(TestCase):
 			self.assertRaises(KeyError,
 				bindb.aux_get, "dev-libs/A-1", ["EAPI"])
 			bindb.aux_get("dev-libs/A-moved-1", ["EAPI"])
+
+			# move old-cat/B new-cat/B
+			vardb.aux_get("new-cat/B-1", ["EAPI"])
+			bindb.aux_get("new-cat/B-1", ["EAPI"])
+			for cpv in bindb.cpv_all():
+				bindb.aux_update(cpv, {"KEYWORDS": "*"})
 
 			# dont_apply_updates
 			self.assertRaises(KeyError,
