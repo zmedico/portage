@@ -735,6 +735,9 @@ class _special_filename(_filename_base):
 			return self.file_name < other.file_name
 
 class GenChangeLogs(object):
+
+	_GIT_LOG_OPTS = ('-m', '--first-parent')
+
 	def __init__(self, portdb, changelog_output, changelog_reversed,
 		max_jobs=None, max_load=None):
 		self.returncode = os.EX_OK
@@ -770,7 +773,8 @@ class GenChangeLogs(object):
 		os.chdir(os.path.join(self._repo_path, cp))
 		# Determine whether ChangeLog is up-to-date by comparing
 		# the newest commit timestamp with the ChangeLog timestamp.
-		lmod = self.grab(['git', self._work_tree, 'log', '--format=%ct', '-1', '.'])
+		lmod = self.grab(['git', self._work_tree, 'log']
+			+ list(self._GIT_LOG_OPTS) + ['--format=%ct', '-1', '.'])
 		if not lmod:
 			# This cp has not been added to the repo.
 			return
@@ -802,7 +806,8 @@ class GenChangeLogs(object):
 			''' % (cp, time.strftime('%Y'))))
 
 		# now grab all the commits
-		revlist_cmd = ['git', self._work_tree, 'rev-list']
+		revlist_cmd = ['git', self._work_tree, 'rev-list'
+			] + list(self._GIT_LOG_OPTS)
 		if self._changelog_reversed:
 			revlist_cmd.append('--reverse')
 		revlist_cmd.extend(['HEAD', '--', '.'])
@@ -810,6 +815,7 @@ class GenChangeLogs(object):
 
 		for c in commits:
 			# Explaining the arguments:
+			# -m --first-parent filters merge commit noise (`man git-log`)
 			# --name-status to get a list of added/removed files
 			# --no-renames to avoid getting more complex records on the list
 			# --format to get the timestamp, author and commit description
@@ -818,7 +824,8 @@ class GenChangeLogs(object):
 			# -r (recursive) to get per-file changes
 			# then the commit-id and path.
 
-			cinfo = self.grab(['git', self._work_tree, 'diff-tree',
+			cinfo = self.grab(['git', self._work_tree, 'diff-tree']
+					+ list(self._GIT_LOG_OPTS) + [
 					'--name-status',
 					'--no-renames',
 					'--format=%ct %cN <%cE>%n%B',
