@@ -110,6 +110,12 @@ class GitSync(NewBase):
 			**self.spawn_kwargs)
 
 		if exitcode == os.EX_OK and self.repo.sync_depth is not None:
+			# Refresh the index in order to ensure that `git reset --hard`
+			# will not re-write files unnecessarily.
+			subprocess.call(
+				[self.bin_command, 'update-index', '--really-refresh'],
+				cwd=portage._unicode_encode(self.repo.location))
+
 			reset_cmd = [self.bin_command, 'reset', '--hard', remote_branch]
 			if quiet:
 				reset_cmd.append('--quiet')
