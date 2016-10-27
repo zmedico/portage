@@ -72,6 +72,7 @@ fi
 unset f
 unset IFS
 
+insecure=false
 do_verbose=0
 MUST_SYNC='1'
 unset PUKE_HELP
@@ -82,7 +83,9 @@ for x in $*; do
 			continue
 			;;
 	esac
-	if [[ $x == "-u" ]]; then
+	if [[ $x == "--insecure" ]]; then
+		insecure=true
+	elif [[ $x == "-u" ]]; then
 		MUST_SYNC=''
 	elif [[ $x == "-k" ]]; then
 		KEEP_OLDIES='asdf'
@@ -95,6 +98,7 @@ for x in $*; do
 		echo "$x isn't a valid arg.  bailing."
 	fi
 	if [[ -n $PUKE_HELP ]]; then
+		echo "--insecure to disable OpenPGP signature verification"
 		echo "-u for upgrade; sync only if new snapshots are found"
 		echo "-k for keep; keep old tree snapshots around"
 		exit -1
@@ -107,11 +111,11 @@ if [[ ! -d $STATE_DIR ]]; then
 fi
 
 if has webrsync-gpg ${FEATURES} ; then
-	WEBSYNC_VERIFY_SIGNATURE=1
+	VERIFY_SIGNATURE_LEGACY_MODE=1
 else
-	WEBSYNC_VERIFY_SIGNATURE=0
+	VERIFY_SIGNATURE_LEGACY_MODE=0
 fi
-if [ ${WEBSYNC_VERIFY_SIGNATURE} != 0 -a -z "${PORTAGE_GPG_DIR}" ]; then
+if [ ${VERIFY_SIGNATURE_LEGACY_MODE} != 0 -a -z "${PORTAGE_GPG_DIR}" ]; then
 	eecho "please set PORTAGE_GPG_DIR in make.conf"
 	exit 1
 fi
@@ -152,6 +156,16 @@ fi
 #---------------
 #funcs
 #---------------
+
+insecure_bypass_msg() {
+	wecho "The --insecure option can be used to bypass this step."
+	insecure_warning_msg
+}
+
+insecure_warning_msg() {
+	wecho "The --insecure option prevents detection of"
+	wecho "man-in-the-middle attacks!"
+}
 
 cleanse_state_dir() {
 	[[ ${STATE_DIR:-/} != '/' ]] && rm -f "${STATE_DIR}"/* &> /dev/null
@@ -268,7 +282,7 @@ check_file_signature() {
 	local file="$2"
 	local r=1
 
-	if [[ ${WEBSYNC_VERIFY_SIGNATURE} != 0 ]] ; then
+	if [ ${VERIFY_SIGNATURE_LEGACY_MODE} != 0 ]; then
 
 		__vecho "Checking signature ..."
 
@@ -278,6 +292,17 @@ check_file_signature() {
 			eecho "cannot check signature: gpg binary not found"
 			exit 1
 		fi
+	elif ! ${insecure}; then
+		__vecho "Checking signature ..."
+
+		# gkeys requires that the signature file be in the same directory
+		# as the snapshot
+		if [[ ${signature} != ${file}.gpgsig ]]; then
+			# this should not happen
+			eecho "assertion failed: ${signature} != ${file}.gpgsig"
+			exit 1
+		fi
+		gkeys verify -C gentoo -n snapshot -F "${file}" && r=0
 	else
 		r=0
 	fi
@@ -552,6 +577,25 @@ verify_md5_file() {
 #inline actual script
 #--------------------
 
+if ${insecure}; then
+	insecure_warning_msg
+elif [[ ${VERIFY_SIGNATURE_LEGACY_MODE} == 1 ]]; then
+	wecho "FEATURES=webrsync-gpg is deprecated."
+	wecho "By default, the new gkeys verification mode will be used"
+	wecho "when FEATURES=webrsync-gpg is not enabled."
+else
+	if ! type -P gkeys >/dev/null; then
+		eecho "gkeys: command not found"
+		eecho "Please try again after installing gkeys: emerge app-crypt/gkeys"
+		insecure_bypass_msg
+		exit 1
+	elif ! gkeys refresh-key -C gentoo -n snapshot; then
+		eecho "gkeys refresh-key failed"
+		insecure_bypass_msg
+		exit 1
+	fi
+fi
+
 if ! type -p patcher &> /dev/null; then
 	echo "!!!"
 	echo "!!! cannot find patcher, did you emerge dev-util/diffball?"
@@ -666,13 +710,13 @@ if [[ -z $patches ]]; then
 	echo "no patches found? up to date?"
 	if [[ -n $MUST_SYNC ]]; then
 		echo "syncing with existing file"
-		if [[ ${WEBSYNC_VERIFY_SIGNATURE} == 1 &&
+		if [[ ${VERIFY_SIGNATURE_LEGACY_MODE} == 1 &&
 			! -e ${DISTDIR}/portage-${base_date}.tar.bz2.gpgsig ]] && \
 			! fetch_from_mirrors "/snapshots/portage-${base_date}.tar.bz2.gpgsig" "portage-${base_date}.tar.bz2.gpgsig" ; then
 			eecho "Couldn't fetch portage-${base_date}.tar.bz2.gpgsig"
 			exit 5
 		fi
-		if [[ ${WEBSYNC_VERIFY_SIGNATURE} == 1 ]] ; then
+		if [[ ${VERIFY_SIGNATURE_LEGACY_MODE} == 1 ]] ; then
 			check_file_signature "${DISTDIR}/portage-${base_date}.tar.bz2.gpgsig" "${dfile}" || exit 1
 		fi
 		sync_local "${dfile}" && rm -fr "${TMPDIR}"
@@ -701,7 +745,7 @@ else
 	fi
 fi
 
-if [[ ${WEBSYNC_VERIFY_SIGNATURE} == 1 && ! -e portage-${final_date}.tar.bz2.gpgsig ]] && \
+if [[ ${VERIFY_SIGNATURE_LEGACY_MODE} == 1 && ! -e portage-${final_date}.tar.bz2.gpgsig ]] && \
 	! fetch_from_mirrors "/snapshots/portage-${final_date}.tar.bz2.gpgsig" "portage-${final_date}.tar.bz2.gpgsig" ; then
 	echo "warning... couldn't grab the gpgsig for ${final_date}.  which is odd"
 	echo "thus, bailing (sorry)"
@@ -734,7 +778,7 @@ fi
 unset need_last_sync
 if [ "$verified" == "1" ]; then
 	need_last_sync="dar"
-	if [[ ${WEBSYNC_VERIFY_SIGNATURE} == 1 ]] ; then
+	if [[ ${VERIFY_SIGNATURE_LEGACY_MODE} == 1 ]] ; then
 		# BUG: Signature verification will fail if the local bzip2
 		# program does not produce output that is perfectly identical
 		# to the bzip2 program used to compress the signed tar file.
@@ -785,7 +829,7 @@ else
 fi
 
 if [ -z "${need_last_sync}" ]; then
-	if [[ ${WEBSYNC_VERIFY_SIGNATURE} == 1 ]] ; then
+	if [[ ${VERIFY_SIGNATURE_LEGACY_MODE} == 1 ]] ; then
 		check_file_signature "${DISTDIR}/portage-${final_date}.tar.bz2.gpgsig" "${dfile}" || exit 1
 	fi
 	echo "beginning update to the tree"
