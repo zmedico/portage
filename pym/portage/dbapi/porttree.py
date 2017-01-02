@@ -791,7 +791,7 @@ class portdbapi(dbapi):
 						writemsg(_("\nInvalid ebuild version: %s\n") % \
 							os.path.join(oroot, mycp, x), noiselevel=-1)
 						continue
-					d[_pkg_str(mysplit[0]+"/"+pf)] = None
+					d[_pkg_str(mysplit[0]+"/"+pf, settings=self.settings)] = None
 		if invalid_category and d:
 			writemsg(_("\n!!! '%s' has a category that is not listed in " \
 				"%setc/portage/categories\n") % \

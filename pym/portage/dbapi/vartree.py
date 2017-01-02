@@ -461,9 +461,7 @@ class vardbapi(dbapi):
 			if len(mysplit) > 1:
 				if ps[0] == mysplit[1]:
 					cpv = "%s/%s" % (mysplit[0], x)
-					metadata = dict(zip(self._aux_cache_keys,
-						self.aux_get(cpv, self._aux_cache_keys)))
-					returnme.append(_pkg_str(cpv, metadata=metadata))
+					returnme.append(self._pkg_str(cpv, None))
 		self._cpv_sort_ascending(returnme)
 		if use_cache:
 			self.cpcache[mycp] = [mystat, returnme[:]]

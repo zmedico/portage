@@ -116,6 +116,23 @@ def ververify(myver, silent=1):
 			print(_("!!! syntax error in version: %s") % myver)
 		return False
 
+
+class _version(_unicode):
+	"""
+	A class for version strings which includes an attribute to cache
+	vercmp results. The vercmp cache is attached to instances of this
+	class so that it can be garbage collected when there are no remaining
+	references to the versions that it contains.
+	"""
+
+	__slots__ = ('_vercmp_cache',)
+
+	def __new__(cls, version, vercmp_cache=None):
+		inst = _unicode.__new__(cls, version)
+		inst._vercmp_cache = vercmp_cache
+		return inst
+
+
 def vercmp(ver1, ver2, silent=1):
 	"""
 	Compare two versions
@@ -139,6 +156,41 @@ def vercmp(ver1, ver2, silent=1):
 	3. 0 if ver1 equals ver2
 	4. None if ver1 or ver2 are invalid (see ver_regexp in portage.versions.py)
 	"""
+
+	try:
+		vercmp_cache = ver1._vercmp_cache
+		vercmp_cache2 = ver2._vercmp_cache
+	except AttributeError:
+		return _vercmp(ver1, ver2, silent=silent)
+	else:
+		if vercmp_cache is vercmp_cache2:
+			if vercmp_cache is None:
+				vercmp_cache = ver1._vercmp_cache = ver2._vercmp_cache = {}
+		elif vercmp_cache is None:
+			vercmp_cache = ver1._vercmp_cache = vercmp_cache2
+		elif vercmp_cache2 is None:
+			ver2._vercmp_cache = vercmp_cache
+		elif len(vercmp_cache) >= len(vercmp_cache2):
+			vercmp_cache.update(vercmp_cache2)
+			ver2._vercmp_cache = vercmp_cache
+		else:
+			vercmp_cache2.update(vercmp_cache)
+			vercmp_cache = ver1._vercmp_cache = vercmp_cache2
+
+		cache_key = (ver1, ver2)
+		try:
+			return vercmp_cache[cache_key]
+		except KeyError:
+			pass
+
+		result = _vercmp(ver1, ver2, silent=silent)
+		vercmp_cache[cache_key] = result
+		if result is not None:
+			vercmp_cache[(ver2, ver1)] = -1 * result
+		return result
+
+
+def _vercmp(ver1, ver2, silent=1):
 
 	if ver1 == ver2:
 		return 0
@@ -401,10 +453,13 @@ class _pkg_str(_unicode):
 		if self.cpv_split is None:
 			raise InvalidData(cpv)
 		self.__dict__['cp'] = self.cpv_split[0] + '/' + self.cpv_split[1]
+		vercmp_cache = None if settings is None else settings._vercmp_cache
 		if self.cpv_split[-1] == "r0" and cpv[-3:] != "-r0":
-			self.__dict__['version'] = "-".join(self.cpv_split[2:-1])
+			self.__dict__['version'] = _version("-".join(self.cpv_split[2:-1]),
+				vercmp_cache=vercmp_cache)
 		else:
-			self.__dict__['version'] = "-".join(self.cpv_split[2:])
+			self.__dict__['version'] = _version("-".join(self.cpv_split[2:]),
+				vercmp_cache=vercmp_cache)
 		# for match_from_list introspection
 		self.__dict__['cpv'] = self
 		if slot is not None:

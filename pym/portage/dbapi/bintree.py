@@ -722,7 +722,7 @@ class binarytree(object):
 					pkg_metadata.pop("PF")
 					mycpv = _pkg_str(mycpv,
 						metadata=self.dbapi._aux_cache_slot_dict(
-						pkg_metadata))
+						pkg_metadata), settings=self.settings)
 					pkg_paths[_instance_key(mycpv)] = mypath
 					self.dbapi.cpv_inject(mycpv)
 					update_pkgindex = True

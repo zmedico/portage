@@ -233,6 +233,7 @@ class config(object):
 		self._make_defaults = None
 		self._parent_stable = None
 		self._soname_provided = None
+		self._vercmp_cache = {}
 
 		# _unknown_features records unknown features that
 		# have triggered warning messages, and ensures that
@@ -281,6 +282,7 @@ class config(object):
 
 			# shared mutable attributes
 			self._unknown_features = clone._unknown_features
+			self._vercmp_cache = clone._vercmp_cache
 
 			self.modules         = copy.deepcopy(clone.modules)
 			self._penv = copy.deepcopy(clone._penv)

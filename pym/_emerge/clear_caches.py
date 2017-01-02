@@ -1,10 +1,11 @@
-# Copyright 1999-2013 Gentoo Foundation
+# Copyright 1999-2017 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
 import gc
 
 def clear_caches(trees):
 	for d in trees.values():
+		d["porttree"].dbapi.settings._vercmp_cache.clear()
 		d["porttree"].dbapi.melt()
 		d["porttree"].dbapi._aux_cache.clear()
 		d["bintree"].dbapi._clear_cache()
