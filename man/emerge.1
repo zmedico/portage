@@ -936,6 +936,13 @@ for testing and development. Package atoms specified on
 the command line are greedy, meaning that unspecific
 atoms may match multiple versions of slotted packages.
 .TP
+.BR "\-\-update\-any < y | n >"
+Grants the dependency resolver permission to update or rebuild any
+packages necessary. This option is enabled by default. When this
+option is disabled, the \fB\-\-deep\fR and \fB\-\-update\fR
+options control which packages the dependency resolver is permitted
+to update or rebuild.
+.TP
 .BR "\-\-use\-ebuild\-visibility [ y | n ]"
 Use unbuilt ebuild metadata for visibility
 checks on built packages.

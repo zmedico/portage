@@ -27,11 +27,14 @@ def create_depgraph_params(myopts, myaction):
 	# with_test_deps: pull in test deps for packages matched by arguments
 	# changed_deps: rebuild installed packages with outdated deps
 	# binpkg_changed_deps: reject binary packages with outdated deps
+	# update_any: update or rebuild any packages necessary
 	myparams = {"recurse" : True}
 
 	bdeps = myopts.get("--with-bdeps")
 	if bdeps is not None:
 		myparams["bdeps"] = bdeps
+
+	myparams["update_any"] = myopts.get("--update-any") != "n"
 
 	ignore_built_slot_operator_deps = myopts.get("--ignore-built-slot-operator-deps")
 	if ignore_built_slot_operator_deps is not None:

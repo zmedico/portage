@@ -689,6 +689,11 @@ def parse_opts(tmpcmdline, silent=False):
 			"action" : "append",
 		},
 
+		"--update-any": {
+			"help": "update or rebuild any packages necessary",
+			"choices": ("y", "n"),
+		},
+
 		"--use-ebuild-visibility": {
 			"help"     : "use unbuilt ebuild metadata for visibility checks on built packages",
 			"choices"  : true_y_or_n
