@@ -113,6 +113,8 @@ class EventLoop(object):
 		self._idle_callbacks = OrderedDict()
 		self._timeout_handlers = {}
 		self._timeout_interval = None
+		self._thread_id = None
+		self._stopping = False
 
 		self._poll_obj = None
 		try:
@@ -234,6 +236,16 @@ class EventLoop(object):
 		@rtype: bool
 		@return: True if events were dispatched.
 		"""
+		if self._thread_id is not None:
+			raise RuntimeError("This event loop is already running")
+
+		self._thread_id = threading.current_thread().ident
+		try:
+			return self._iteration(*args)
+		finally:
+			self._thread_id = None
+
+	def _iteration(self, *args):
 
 		may_block = True
 
@@ -629,6 +641,27 @@ class EventLoop(object):
 		del self._poll_event_handlers[f]
 		return True
 
+	def run_forever(self):
+		"""
+		Run until stop() is called. For more information, refer to the
+		documention for the asyncio.AbstractEventLoop.run_forever()
+		method.
+		"""
+		if self.is_running():
+			raise RuntimeError('This event loop is already running')
+
+		args = []
+		if self._stopping:
+			# do not block for new I/O events
+			args.append(False)
+		try:
+			while True:
+				self.iteration(*args)
+				if self._stopping:
+					break
+		finally:
+			self._stopping = False
+
 	def run_until_complete(self, future):
 		"""
 		Run until the Future is done.
@@ -639,10 +672,29 @@ class EventLoop(object):
 		@return: the Future's result
 		@raise: the Future's exception
 		"""
-		while not future.done():
-			self.iteration()
+		done_callback = lambda future: self.stop()
+		future.add_done_callback(done_callback)
+		try:
+			self.run_forever()
+		finally:
+			future.remove_done_callback(done_callback)
+
+		if not future.done():
+			raise RuntimeError('Event loop stopped before Future completed')
 
 		return future.result()
+
+	def stop(self):
+		"""Stop running the event loop.
+
+		Every callback already scheduled will still run.  This simply informs
+		run_forever to stop looping after a complete iteration.
+		"""
+		self._stopping = True
+
+	def is_running(self):
+		"""Returns True if the event loop is running."""
+		return (self._thread_id is not None)
 
 	def call_soon(self, callback, *args):
 		"""
