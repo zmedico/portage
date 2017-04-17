@@ -209,6 +209,9 @@ class Package(Task):
 	def _gen_hash_key(cls, cpv=None, installed=None, onlydeps=None,
 		operation=None, repo_name=None, root_config=None,
 		type_name=None, **kwargs):
+		# TODO: Add USE to the key for unbuilt ebuilds, since we need
+		# to add multiple USE combinations to the graph when there are
+		# conflicts.
 
 		if operation is None:
 			if installed or onlydeps:

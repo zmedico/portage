@@ -2931,7 +2931,16 @@ class depgraph(object):
 			pkg.root, pkg.slot_atom, installed=False), None)
 
 		matches = None
-		if existing_node:
+		if existing_node is pkg and pkg in self._dynamic_config._needed_use_config_changes:
+			pkg_with_use = pkg.with_use(self._pkg_use_enabled(pkg))
+			for ppkg, patom in self._dynamic_config._parent_atoms.get(pkg):
+				if not patom.match(pkg_with_use):
+					matches = False
+					break
+			else:
+				matches = atom.match(pkg_with_use)
+
+		elif existing_node:
 			matches = pkg.cpv == existing_node.cpv
 			if pkg != existing_node and \
 				atom is not None:
@@ -3060,6 +3069,10 @@ class depgraph(object):
 								level=logging.DEBUG, noiselevel=-1)
 
 				else:
+					if pkg is existing_node:
+						pkg = pkg.with_use(self._pkg_use_enabled(pkg))
+						previously_added = False
+
 					if debug:
 						writemsg_level(
 							"%s%s %s\n" % ("Slot Conflict:".ljust(15),
