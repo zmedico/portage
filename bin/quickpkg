@@ -17,6 +17,12 @@ if osp.isfile(osp.join(osp.dirname(osp.dirname(osp.realpath(__file__))), ".porta
 	sys.path.insert(0, osp.join(osp.dirname(osp.dirname(osp.realpath(__file__))), "pym"))
 import portage
 portage._internal_caller = True
+portage.proxy.lazyimport.lazyimport(globals(),
+	'_emerge.actions:load_emerge_config',
+	'_emerge.depgraph:depgraph',
+	'_emerge.main:parse_opts',
+	'_emerge.create_depgraph_params:create_depgraph_params',
+)
 from portage import os
 from portage import xpak
 from portage.dbapi.dep_expand import dep_expand
@@ -28,6 +34,7 @@ xattr = _xattr.xattr
 from portage.dbapi.vartree import dblink, tar_contents
 from portage.checksum import perform_md5
 from portage._sets import load_default_config, SETPREFIX
+from portage._sets.base import InternalPackageSet
 from portage.process import find_binary
 from portage.util.compression_probe import _compressors
 
@@ -262,7 +269,48 @@ def quickpkg_extended_atom(options, infos, atom, eout):
 		quickpkg_atom(options, infos, atom, eout)
 
 
+def calc_deep(options, args, eout):
+
+	# Translate quickpkg args to equivalent emerge args
+	emerge_args = []
+	if options.with_bdeps is not None:
+		emerge_args.append('--with-bdeps={}'.format(options.with_bdeps))
+
+	emerge_config = load_emerge_config(trees=portage.db,
+		opts=parse_opts(emerge_args, silent=True)[1])
+
+	# Parse EMERGE_DEFAULT_OPTS, for settings like --package-moves=n.
+	emerge_args = portage.util.shlex_split(
+		emerge_config.target_config.settings.get(
+		"EMERGE_DEFAULT_OPTS", "")) + emerge_args
+	emerge_config.opts = parse_opts(emerge_args, silent=True)[1]
+	root_config = emerge_config.target_root
+	psets = root_config.setconfig.psets
+	required_sets = {}
+	# TODO: handle set args
+	required_sets['args'] = InternalPackageSet(initial_atoms=args)
+
+	portage.writemsg("\nCalculating dependencies  ")
+	resolver_params = create_depgraph_params(emerge_config.opts, "remove")
+	resolver = depgraph(root_config.settings, root_config.trees,
+		emerge_config.opts, resolver_params, None)
+	resolver._load_vdb()
+	vardb = resolver._frozen_config.trees[root_config.root]["vartree"].dbapi
+	real_vardb = root_config.trees[root_config.root]["vartree"].dbapi
+
+	success = resolver._complete_graph(
+		required_sets={root_config.root:required_sets})
+	portage.writemsg("\b\b... done!\n")
+
+	resolver.display_problems()
+
+	if not success:
+		return 1, [], False, 0
+
 def quickpkg_main(options, args, eout):
+	if options.deep:
+		args = calc_deep(options, args, eout)
+
 	eroot = portage.settings['EROOT']
 	trees = portage.db[eroot]
 	bintree = trees["bintree"]
@@ -340,6 +388,9 @@ def quickpkg_main(options, args, eout):
 if __name__ == "__main__":
 	usage = "quickpkg [options] <list of package atoms or package sets>"
 	parser = argparse.ArgumentParser(usage=usage)
+	parser.add_argument("--deep",
+		default=False,
+		help="include dependencies")
 	parser.add_argument("--umask",
 		default="0077",
 		help="umask used during package creation (default is 0077)")
@@ -356,6 +407,9 @@ if __name__ == "__main__":
 		default="n",
 		metavar="<y|n>",
 		help="include files protected by CONFIG_PROTECT that have not been modified since installation (as a security precaution, default is 'n')")
+	parser.add_argument("--with-bdeps",
+		choices=("y", "n"),
+		help="include unnecessary build time dependencies")
 	options, args = parser.parse_known_args(sys.argv[1:])
 	if not options.ignore_default_opts:
 		default_opts = shlex_split(
