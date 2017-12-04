@@ -32,6 +32,7 @@ portage.proxy.lazyimport.lazyimport(globals(),
 	'portage.package.ebuild.digestgen:digestgen',
 	'portage.package.ebuild.fetch:fetch',
 	'portage.package.ebuild._ipc.QueryCommand:QueryCommand',
+	'portage.dep._extract_conditionals:extract_conditionals@_extract_conditionals',
 	'portage.dep._slot_operator:evaluate_slot_operator_equal_deps',
 	'portage.package.ebuild._spawn_nofetch:spawn_nofetch',
 	'portage.util.elf.header:ELFHeader',
@@ -1994,14 +1995,19 @@ def _post_src_install_write_metadata(settings):
 				pass
 			continue
 
+		test_deps = None
 		if k.endswith('DEPEND'):
 			if eapi_attrs.slot_operator:
 				continue
 			token_class = Atom
+			if k in Package._buildtime_keys:
+				test_deps = _extract_conditionals(v, ('test',))
 		else:
 			token_class = None
 
 		v = use_reduce(v, uselist=use, token_class=token_class)
+		if test_deps:
+			v.extend(test_deps)
 		v = paren_enclose(v)
 		if not v:
 			try:
@@ -2016,9 +2022,15 @@ def _post_src_install_write_metadata(settings):
 			f.write('%s\n' % v)
 
 	if eapi_attrs.slot_operator:
+		metadata = settings.configdict['pkg']
 		deps = evaluate_slot_operator_equal_deps(settings, use, QueryCommand.get_db())
 		for k, v in deps.items():
-			filename = os.path.join(build_info_dir, k)
+			if k in Package._buildtime_keys:
+				test_deps = metadata.get(k)
+				if test_deps:
+					test_deps = _extract_conditionals(test_deps, ('test',))
+					if test_deps:
+						v += ' ' + paren_enclose(test_deps)
 			if not v:
 				try:
 					os.unlink(filename)

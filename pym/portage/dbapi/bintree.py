@@ -11,6 +11,7 @@ portage.proxy.lazyimport.lazyimport(globals(),
 		'verify_all,_apply_hash_filter,_hash_filter',
 	'portage.dbapi.dep_expand:dep_expand',
 	'portage.dep:dep_getkey,isjustname,isvalidatom,match_from_list',
+	'portage.dep._extract_conditionals:extract_conditionals@_extract_conditionals',
 	'portage.output:EOutput,colorize',
 	'portage.locks:lockfile,unlockfile',
 	'portage.package.ebuild.fetch:_check_distfile,_hide_url_passwd',
@@ -34,6 +35,7 @@ from portage import os
 from portage import _encodings
 from portage import _unicode_decode
 from portage import _unicode_encode
+from _emerge.Package import Package
 
 import codecs
 import errno
@@ -1344,8 +1346,14 @@ class binarytree(object):
 			deps = metadata.get(k)
 			if deps is None:
 				continue
+
+			test_deps = None
+			if k in Package._buildtime_keys:
+				test_deps = _extract_conditionals(deps, ('test',))
 			try:
 				deps = use_reduce(deps, uselist=use, token_class=token_class)
+				if test_deps:
+					deps.extend(test_deps)
 				deps = paren_enclose(deps)
 			except portage.exception.InvalidDependString as e:
 				writemsg("%s: %s\n" % (k, e), noiselevel=-1)
