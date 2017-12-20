@@ -1029,6 +1029,7 @@ def match_orphaned(metadata_xml):
 
 def pquery(parser, opts, args):
 	portdb = portage.db[portage.root]['porttree'].dbapi
+	vardb = portage.db[portage.root]['vartree'].dbapi
 	root_config = RootConfig(portdb.settings,
 		portage.db[portage.root], None)
 
@@ -1095,7 +1096,10 @@ def pquery(parser, opts, args):
 
 	if not atoms:
 		names = None
-		categories = list(portdb.categories)
+		if opts.installed:
+			categories = list(vardb.categories)
+		else:
+			categories = list(portdb.categories)
 	else:
 		category_wildcard = False
 		name_wildcard = False
@@ -1111,7 +1115,10 @@ def pquery(parser, opts, args):
 				name_wildcard = True
 
 		if category_wildcard:
-			categories = list(portdb.categories)
+			if opts.installed:
+				categories = list(vardb.categories)
+			else:
+				categories = list(portdb.categories)
 		else:
 			categories = list(set(categories))
 
@@ -1123,9 +1130,17 @@ def pquery(parser, opts, args):
 	no_version = opts.no_version
 	categories.sort()
 
+	installed_cats = {}
+	if opts.installed and names is None:
+		for cpv in vardb.cpv_all():
+			installed_cats.setdefault(portage.catsplit(cpv.cp)[0], []).append(cpv.cp)
+
 	for category in categories:
 		if names is None:
-			cp_list = portdb.cp_all(categories=(category,))
+			if opts.installed:
+				cp_list = sorted(set(installed_cats.get(category, [])))
+			else:
+				cp_list = portdb.cp_all(categories=(category,))
 		else:
 			cp_list = [category + "/" + name for name in names]
 		for cp in cp_list:
@@ -1226,6 +1241,11 @@ def add_pquery_arguments(parser):
 					"longopt": "--no-filters",
 					"action": "store_true",
 					"help": "no visibility filters (ACCEPT_KEYWORDS, package masking, etc)"
+				},
+				{
+					"longopt": "--installed",
+					"action": "store_true",
+					"help": "search installed packages"
 				},
 				{
 					"longopt": "--repo",
