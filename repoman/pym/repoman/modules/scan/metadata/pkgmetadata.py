@@ -2,6 +2,7 @@
 
 '''Package Metadata Checks operations'''
 
+import io
 import sys
 import re
 
@@ -9,14 +10,14 @@ from itertools import chain
 from collections import Counter
 
 try:
-	from lxml import etree
-	from lxml.etree import ParserError
+	import xml.etree.ElementTree
+	from xml.parsers.expat import ExpatError
 except (SystemExit, KeyboardInterrupt):
 	raise
 except (ImportError, SystemError, RuntimeError, Exception):
 	# broken or missing xml support
 	# https://bugs.python.org/issue14988
-	msg = ["Please emerge dev-python/lxml in order to use repoman."]
+	msg = ["Please enable python's \"xml\" USE flag in order to use repoman."]
 	from portage.output import EOutput
 	out = EOutput()
 	for line in msg:
@@ -26,10 +27,11 @@ except (ImportError, SystemError, RuntimeError, Exception):
 # import our initialized portage instance
 from repoman._portage import portage
 from repoman.metadata import metadata_dtd_uri
+from repoman._xml import _XMLParser, _MetadataTreeBuilder
 from repoman.modules.scan.scanbase import ScanBase
 
 from portage.exception import InvalidAtom
-from portage import os
+from portage import os, _encodings, _unicode_encode
 from portage.dep import Atom
 from portage.xml.metadata import parse_metadata_use
 
@@ -87,11 +89,17 @@ class PkgMetadata(ScanBase, USEFlagChecks):
 
 		# metadata.xml parse check
 		metadata_bad = False
+		xml_info = {}
+		xml_parser = _XMLParser(xml_info, target=_MetadataTreeBuilder())
 
 		# read metadata.xml into memory
 		try:
-			_metadata_xml = etree.parse(os.path.join(checkdir, 'metadata.xml'))
-		except (ParserError, SyntaxError, EnvironmentError) as e:
+			_metadata_xml = xml.etree.ElementTree.parse(
+				_unicode_encode(
+					os.path.join(checkdir, "metadata.xml"),
+					encoding=_encodings['fs'], errors='strict'),
+				parser=xml_parser)
+		except (ExpatError, SyntaxError, EnvironmentError) as e:
 			metadata_bad = True
 			self.qatracker.add_error("metadata.bad", "%s/metadata.xml: %s" % (xpkg, e))
 			del e
@@ -99,27 +107,44 @@ class PkgMetadata(ScanBase, USEFlagChecks):
 			return False
 
 		indentation_chars = Counter()
-		for l in etree.tostring(_metadata_xml).splitlines():
+		#import pdb
+		#pdb.set_trace()
+		xml_str = io.BytesIO()
+		_metadata_xml.write(xml_str)
+		for l in xml_str.getvalue().splitlines():
 			indentation_chars.update(re.match(b"\s*", l).group(0))
 		if len(indentation_chars) > 1:
 			self.qatracker.add_error("metadata.warning", "%s/metadata.xml: %s" %
 				(xpkg, "inconsistent use of tabs and spaces in indentation")
 			)
 
-		xml_encoding = _metadata_xml.docinfo.encoding
-		if xml_encoding.upper() != metadata_xml_encoding:
+		if "XML_DECLARATION" not in xml_info:
 			self.qatracker.add_error(
 				"metadata.bad", "%s/metadata.xml: "
-				"xml declaration encoding should be '%s', not '%s'" %
-				(xpkg, metadata_xml_encoding, xml_encoding))
+				"xml declaration is missing on first line, "
+				"should be '%s'" % (xpkg, metadata_xml_declaration))
+		else:
+			xml_version, xml_encoding, xml_standalone = \
+				xml_info["XML_DECLARATION"]
+			if xml_encoding is None or \
+				xml_encoding.upper() != metadata_xml_encoding:
+				if xml_encoding is None:
+					encoding_problem = "but it is undefined"
+				else:
+					encoding_problem = "not '%s'" % xml_encoding
+				self.qatracker.add_error(
+					"metadata.bad", "%s/metadata.xml: "
+					"xml declaration encoding should be '%s', %s" %
+					(xpkg, metadata_xml_encoding, encoding_problem))
 
-		if not _metadata_xml.docinfo.doctype:
+		if "DOCTYPE" not in xml_info:
 			metadata_bad = True
 			self.qatracker.add_error(
 				"metadata.bad",
 				"%s/metadata.xml: %s" % (xpkg, "DOCTYPE is missing"))
 		else:
-			doctype_system = _metadata_xml.docinfo.system_url
+			doctype_name, doctype_system, doctype_pubid = \
+				xml_info["DOCTYPE"]
 			if doctype_system != metadata_dtd_uri:
 				if doctype_system is None:
 					system_problem = "but it is undefined"
@@ -129,7 +154,7 @@ class PkgMetadata(ScanBase, USEFlagChecks):
 					"metadata.bad", "%s/metadata.xml: "
 					"DOCTYPE: SYSTEM should refer to '%s', %s" %
 					(xpkg, metadata_dtd_uri, system_problem))
-			doctype_name = _metadata_xml.docinfo.doctype.split(' ')[1]
+
 			if doctype_name != metadata_doctype_name:
 				self.qatracker.add_error(
 					"metadata.bad", "%s/metadata.xml: "
@@ -156,7 +181,7 @@ class PkgMetadata(ScanBase, USEFlagChecks):
 
 		# Only carry out if in package directory or check forced
 		if not metadata_bad:
-			validator = etree.XMLSchema(file=self.metadata_xsd)
+			validator = xml.etree.XMLSchema(file=self.metadata_xsd)
 			if not validator.validate(_metadata_xml):
 				self._add_validate_errors(xpkg, validator.error_log)
 		self.muselist = frozenset(self.musedict)
