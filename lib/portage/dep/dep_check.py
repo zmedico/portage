@@ -214,6 +214,14 @@ def _expand_new_virtuals(mysplit, edebug, mydbapi, mysettings, myroot="/",
 			try:
 				mycheck = dep_check(depstring, mydbapi, mysettings,
 					myroot=myroot, trees=trees, **pkg_kwargs)
+				try:
+					mycheck = (True, use_reduce(depstring, uselist=pkg_kwargs["myuse"],
+						masklist=pkg.use.mask, matchall=(kwargs['use']=="all"),
+						excludeall=pkg.use.force,
+						opconvert=True, token_class=Atom, eapi=pkg.eapi))
+				except InvalidDependString as e:
+					raise ParseError("%s: %s '%s'" % \
+						(pkg, "%s" % (e,), depstring))
 			finally:
 				# Restore previous EAPI after recursion.
 				if virt_parent is not None:
