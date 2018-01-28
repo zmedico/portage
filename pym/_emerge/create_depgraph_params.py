@@ -126,6 +126,11 @@ def create_depgraph_params(myopts, myaction):
 	if changed_deps is not None:
 		myparams['changed_deps'] = changed_deps
 
+	changed_deps_report = myopts.get('--changed-deps-report')
+	if (changed_deps_report != 'n' and not
+		(myaction == 'remove' or '--usepkgonly' in myopts)):
+		myparams['changed_deps_report'] = True
+
 	if myopts.get("--selective") == "n":
 		# --selective=n can be used to remove selective
 		# behavior that may have been implied by some
