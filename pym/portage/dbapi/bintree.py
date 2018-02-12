@@ -811,7 +811,10 @@ class binarytree(object):
 
 		self._remote_has_index = False
 		self._remotepkgs = {}
-		for base_url in self.settings["PORTAGE_BINHOST"].split():
+		binhosts = self.settings["PORTAGE_BINHOST"].split()
+		# chromeos multi-binhost unique cpv logic
+		cpv_unique = {} if len(binhosts) > 1 else None
+		for base_url in binhosts:
 			parsed_url = urlparse(base_url)
 			host = parsed_url.netloc
 			port = parsed_url.port
@@ -1029,6 +1032,17 @@ class binarytree(object):
 				for d in pkgindex.packages:
 					cpv = _pkg_str(d["CPV"], metadata=d,
 						settings=self.settings)
+					current_key = self.dbapi._instance_key(cpv)
+					if cpv_unique is not None:
+						previous = cpv_unique.get(cpv)
+						if previous is not None:
+							# Delete previous instance with same cpv but
+							# different instance key.
+							previous_key = self.dbapi._instance_key(previous)
+							if previous_key != current_key:
+								self.dbapi.cpv_remove(previous)
+								del self._remotepkgs[previous_key]
+						cpv_unique[cpv] = cpv
 					# Local package instances override remote instances
 					# with the same instance_key.
 					if self.dbapi.cpv_exists(cpv):
