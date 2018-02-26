@@ -562,10 +562,10 @@ def dep_zapdeps(unreduced, reduced, myroot, use_binaries=0, trees=None,
 					# added to the digraph, in order to distinguish between
 					# those packages and installed packages that may need
 					# to be uninstalled in order to resolve blockers.
-					if not any(pkg in graph for pkg in
-						graph_db.match_pkgs(atom)):
-						all_in_graph = False
-						break
+					#if not any(pkg in graph for pkg in
+					#	graph_db.match_pkgs(atom)):
+					#	all_in_graph = False
+					#	break
 				circular_atom = None
 				if not (parent is None or priority is None) and \
 					(parent.onlydeps or
