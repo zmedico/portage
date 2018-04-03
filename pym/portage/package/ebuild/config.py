@@ -66,6 +66,7 @@ from portage.package.ebuild._config.MaskManager import MaskManager
 from portage.package.ebuild._config.VirtualsManager import VirtualsManager
 from portage.package.ebuild._config.helper import ordered_by_atom_specificity, prune_incremental
 from portage.package.ebuild._config.unpack_dependencies import load_unpack_dependencies_configuration
+from portage.package.ebuild.profile_iuse import profile_iuse
 
 if sys.hexversion >= 0x3000000:
 	# pylint: disable=W0622
@@ -1821,31 +1822,7 @@ class config(object):
 		"""
 		Beginning with EAPI 5, IUSE_EFFECTIVE is defined by PMS.
 		"""
-		iuse_effective = []
-		iuse_effective.extend(self.get("IUSE_IMPLICIT", "").split())
-
-		# USE_EXPAND_IMPLICIT should contain things like ARCH, ELIBC,
-		# KERNEL, and USERLAND.
-		use_expand_implicit = frozenset(
-			self.get("USE_EXPAND_IMPLICIT", "").split())
-
-		# USE_EXPAND_UNPREFIXED should contain at least ARCH, and
-		# USE_EXPAND_VALUES_ARCH should contain all valid ARCH flags.
-		for v in self.get("USE_EXPAND_UNPREFIXED", "").split():
-			if v not in use_expand_implicit:
-				continue
-			iuse_effective.extend(
-				self.get("USE_EXPAND_VALUES_" + v, "").split())
-
-		use_expand = frozenset(self.get("USE_EXPAND", "").split())
-		for v in use_expand_implicit:
-			if v not in use_expand:
-				continue
-			lower_v = v.lower()
-			for x in self.get("USE_EXPAND_VALUES_" + v, "").split():
-				iuse_effective.append(lower_v + "_" + x)
-
-		return frozenset(iuse_effective)
+		return profile_iuse(self)
 
 	def _get_implicit_iuse(self):
 		"""
