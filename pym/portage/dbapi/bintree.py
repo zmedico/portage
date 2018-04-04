@@ -29,6 +29,7 @@ from portage.dep import Atom, use_reduce, paren_enclose
 from portage.exception import AlarmSignal, InvalidData, InvalidPackageName, \
 	ParseError, PermissionDenied, PortageException
 from portage.localization import _
+from portage.package.ebuild.profile_iuse_effective import profile_iuse_effective
 from portage import _movefile
 from portage import os
 from portage import _encodings
@@ -805,6 +806,9 @@ class binarytree(object):
 				pkgindex.packages.extend(iter(metadata.values()))
 				self._update_pkgindex_header(pkgindex.header)
 
+		if not update_pkgindex:
+			self.dbapi._iuse_implicit.update(profile_iuse_effective(pkgindex.header))
+
 		return pkgindex if update_pkgindex else None
 
 	def _populate_remote(self, getbinpkg_refresh=True):
@@ -1025,6 +1029,7 @@ class binarytree(object):
 					# The current user doesn't have permission to cache the
 					# file, but that's alright.
 			if pkgindex:
+				self.dbapi._iuse_implicit.update(profile_iuse_effective(pkgindex.header))
 				remote_base_uri = pkgindex.header.get("URI", base_url)
 				for d in pkgindex.packages:
 					cpv = _pkg_str(d["CPV"], metadata=d,

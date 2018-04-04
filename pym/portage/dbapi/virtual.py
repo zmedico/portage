@@ -31,6 +31,7 @@ class fakedbapi(dbapi):
 		self.settings = settings
 		self._match_cache = {}
 		self._set_multi_instance(multi_instance)
+		self._iuse_implicit = set()
 
 	def _set_multi_instance(self, multi_instance):
 		"""
@@ -80,6 +81,7 @@ class fakedbapi(dbapi):
 		self._clear_cache()
 		self.cpvdict.clear()
 		self.cpdict.clear()
+		self._iuse_implicit.clear()
 
 	def _clear_cache(self):
 		if self._categories is not None:
