@@ -29,6 +29,7 @@ from portage.dep import Atom, use_reduce, paren_enclose
 from portage.exception import AlarmSignal, InvalidData, InvalidPackageName, \
 	ParseError, PermissionDenied, PortageException
 from portage.localization import _
+from portage.package.ebuild.profile_iuse import profile_iuse
 from portage import _movefile
 from portage import os
 from portage import _encodings
@@ -93,6 +94,7 @@ class bindbapi(fakedbapi):
 			])
 		self._aux_cache_slot_dict = slot_dict_class(self._aux_cache_keys)
 		self._aux_cache = {}
+		self._iuse_implicit = set()
 
 	@property
 	def writable(self):
@@ -104,6 +106,10 @@ class bindbapi(fakedbapi):
 			False otherwise
 		"""
 		return os.access(first_existing(self.bintree.pkgdir), os.W_OK)
+
+	def clear(self):
+		fakedbapi.clear(self)
+		self._iuse_implicit.clear()
 
 	def match(self, *pargs, **kwargs):
 		if self.bintree and not self.bintree.populated:
@@ -125,6 +131,10 @@ class bindbapi(fakedbapi):
 		if not self.bintree.populated:
 			self.bintree.populate()
 		fakedbapi.cpv_remove(self, cpv)
+
+	def _iuse_implicit_cnstr(self, pkg, metadata):
+		base_iuse_impl = fakedbapi._iuse_implicit_cnstr(self, pkg, metadata)
+		return lambda flag: base_iuse_impl(flag) or flag in self._iuse_implicit
 
 	def aux_get(self, mycpv, wants, myrepo=None):
 		if self.bintree and not self.bintree.populated:
@@ -805,6 +815,8 @@ class binarytree(object):
 				pkgindex.packages.extend(iter(metadata.values()))
 				self._update_pkgindex_header(pkgindex.header)
 
+			self.dbapi._iuse_implicit.update(profile_iuse(pkgindex.header))
+
 		return pkgindex if update_pkgindex else None
 
 	def _populate_remote(self, getbinpkg_refresh=True):
@@ -1025,6 +1037,7 @@ class binarytree(object):
 					# The current user doesn't have permission to cache the
 					# file, but that's alright.
 			if pkgindex:
+				self.dbapi._iuse_implicit.update(profile_iuse(pkgindex.header))
 				remote_base_uri = pkgindex.header.get("URI", base_url)
 				for d in pkgindex.packages:
 					cpv = _pkg_str(d["CPV"], metadata=d,
