@@ -1,8 +1,10 @@
 # Copyright 2010-2018 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
+import portage
 from portage.tests import TestCase
 from portage.dep import check_required_use
+from portage.dep.required_use.validate_ast import validate_ast_passthrough
 from portage.exception import InvalidDependString
 
 class TestCheckRequiredUse(TestCase):
@@ -228,7 +230,13 @@ class TestCheckRequiredUse(TestCase):
 			),
 		)
 		for required_use, use, expected in test_cases:
-			result = check_required_use(required_use, use, lambda k: True).tounicode()
+			node = check_required_use(required_use, use, lambda k: True)
+			try:
+				list(validate_ast_passthrough(node.ast))
+			except portage.exception.PortageException as e:
+				if 'group in ^^ operator forbidden' not in str(e):
+					raise
+			result = node.tounicode()
 			self.assertEqual(result, expected,
 				"REQUIRED_USE = '%s', USE = '%s', '%s' != '%s'" % \
 				(required_use, " ".join(use), result, expected))
