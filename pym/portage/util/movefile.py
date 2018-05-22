@@ -255,7 +255,12 @@ def movefile(src, dest, newmtime=None, sstat=None, mysettings=None,
 			if selinux_enabled:
 				selinux.rename(src, dest)
 			else:
-				os.rename(src, dest)
+				head, tail = os.path.split(dest)
+				hardlink_tmp = os.path.join(head, ".%s._portage_merge_.%s" % \
+					(tail, os.getpid()))
+				os.link(src, hardlink_tmp)
+				os.rename(hardlink_tmp, dest)
+				os.unlink(src)
 			renamefailed = 0
 		except OSError as e:
 			if e.errno != errno.EXDEV:
