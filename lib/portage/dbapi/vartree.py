@@ -4675,6 +4675,7 @@ class dblink(object):
 		srcroot = normalize_path(srcroot).rstrip(sep) + sep
 		destroot = normalize_path(destroot).rstrip(sep) + sep
 		calc_prelink = "prelink-checksums" in self.settings.features
+		overwrite_dir_perms = "overwrite-dir-perms" in self.settings.features
 
 		protect_if_modified = \
 			"config-protect-if-modified" in self.settings.features and \
@@ -4741,11 +4742,22 @@ class dblink(object):
 
 			destmd5 = None
 			mydest_link = None
+			dest_eff = None
+			dest_eff_stat = None
 			# handy variables; mydest is the target object on the live filesystems;
 			# mysrc is the source object in the temporary install dir
 			try:
 				mydstat = os.lstat(mydest)
 				mydmode = mydstat.st_mode
+				if stat.S_ISLNK(mydstat.st_mode):
+					dest_eff = os.path.realpath(mydest)
+					try:
+						dest_eff_stat = os.stat(dest_eff)
+					except OSError:
+						pass
+				else:
+					dest_eff = mydest
+					dest_eff_stat = mydstat
 				if protected:
 					if stat.S_ISLNK(mydmode):
 						# Read symlink target as bytes, in case the
@@ -4879,8 +4891,18 @@ class dblink(object):
 						return 1
 
 					if stat.S_ISDIR(mydmode) or \
-						(stat.S_ISLNK(mydmode) and os.path.isdir(mydest)):
+						(stat.S_ISLNK(mydmode) and dest_eff_stat is not None and stat.S_ISDIR(dest_eff_stat.st_mode)):
 						# a symlink to an existing directory will work for us; keep it:
+
+						if overwrite_dir_perms and not (
+							mystat.st_mode == dest_eff_stat.st_mode and
+							mystat.st_uid == dest_eff_stat.st_uid and
+							mystat.st_gid == dest_eff_stat.st_gid):
+							# Propagate any permissions that differ from the default
+							# DIROPTIONS="-m0755" setting.
+							os.chmod(mydest, mystat.st_mode)
+							os.chown(mydest, mystat.st_uid, mystat.st_gid)
+
 						showMessage("--- %s/\n" % mydest)
 						if bsd_chflags:
 							bsd_chflags.lchflags(mydest, dflags)

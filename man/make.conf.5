@@ -528,6 +528,18 @@ Prevents the stripping of binaries that are merged to the live filesystem.
 .B notitles
 Disables xterm titlebar updates (which contains status info).
 .TP
+.B overwrite\-dir\-perms
+Overwrite existing directory permissions. This is disabled by default in
+order to respect any permissions that may have been set by system
+administrators. When enabled, directories having permissions that differ
+from defaults will automatically overwrite permissions of existing
+directories. The default directory mode is 755, and the default UID and
+GID correspond to \fBPORTAGE_INST_UID\fR and \fBPORTAGE_INST_GID\fR
+respectively. In cases where a package installs a directory with default
+permissions and the existing directory has non\-default permissions,
+the existing directory's permissions will be reverted to default
+permissions only if the directory belongs solely to the current package.
+.TP
 .B parallel\-fetch
 Fetch in the background while compiling. Run
 `tail \-f /var/log/emerge\-fetch.log` in a

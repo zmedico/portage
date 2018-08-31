@@ -169,6 +169,7 @@ SUPPORTED_FEATURES       = frozenset([
 	"noman",
 	"nostrip",
 	"notitles",
+	"overwrite-dir-perms",
 	"parallel-fetch",
 	"parallel-install",
 	"prelink-checksums",
