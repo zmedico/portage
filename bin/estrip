@@ -113,7 +113,7 @@ if [[ ${KERNEL} == linux ]] && ${FEATURES_xattr} ; then
 fi
 
 # look up the tools we might be using
-for t in STRIP:strip OBJCOPY:objcopy READELF:readelf ; do
+for t in STRIP:strip OBJCOPY:objcopy RANLIB:ranlib READELF:readelf ; do
 	v=${t%:*} # STRIP
 	t=${t#*:} # strip
 	eval ${v}=\"${!v:-${CHOST}-${t}}\"
@@ -424,6 +424,8 @@ do
 			# retain the debug info in the archive itself.
 			if ! ${FEATURES_splitdebug} || ${RESTRICT_splitdebug} ; then
 				${STRIP} -g "${x}"
+				# Fix index removed by strip, required for -lto (bug 603594).
+				${RANLIB} "${x}"
 			fi
 		fi
 	elif [[ ${f} == *"SB executable"* || ${f} == *"SB pie executable"* ||
