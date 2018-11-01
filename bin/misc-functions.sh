@@ -109,10 +109,13 @@ install_qa_check() {
 
 	[[ -d ${ED%/}/usr/share/info ]] && prepinfo
 
-	# Apply compression.
-	"${PORTAGE_BIN_PATH}"/ecompress --queue "${PORTAGE_DOCOMPRESS[@]}"
-	"${PORTAGE_BIN_PATH}"/ecompress --ignore "${PORTAGE_DOCOMPRESS_SKIP[@]}"
-	"${PORTAGE_BIN_PATH}"/ecompress --dequeue
+	# If binpkg-docompress is enabled, apply compression before creating
+	# the binary package.
+	if has binpkg-docompress ${FEATURES}; then
+		"${PORTAGE_BIN_PATH}"/ecompress --queue "${PORTAGE_DOCOMPRESS[@]}"
+		"${PORTAGE_BIN_PATH}"/ecompress --ignore "${PORTAGE_DOCOMPRESS_SKIP[@]}"
+		"${PORTAGE_BIN_PATH}"/ecompress --dequeue
+	fi
 
 	export STRIP_MASK
 	if ___eapi_has_dostrip; then
@@ -158,6 +161,29 @@ install_qa_check() {
 
 	# Portage regenerates this on the installed system.
 	rm -f "${ED%/}"/usr/share/info/dir{,.gz,.bz2} || die "rm failed!"
+}
+
+__dyn_instprep() {
+	if has chflags ${FEATURES}; then
+		# Save all the file flags for restoration afterwards.
+		mtree -c -p "${ED}" -k flags > "${T}/bsdflags.mtree"
+		# Remove all the file flags so that we can do anything necessary.
+		chflags -R noschg,nouchg,nosappnd,nouappnd "${ED}"
+		chflags -R nosunlnk,nouunlnk "${ED}" 2>/dev/null
+	fi
+
+	# If binpkg-docompress is disabled, we need to apply compression
+	# before installing.
+	if ! has binpkg-docompress ${FEATURES}; then
+		"${PORTAGE_BIN_PATH}"/ecompress --queue "${PORTAGE_DOCOMPRESS[@]}"
+		"${PORTAGE_BIN_PATH}"/ecompress --ignore "${PORTAGE_DOCOMPRESS_SKIP[@]}"
+		"${PORTAGE_BIN_PATH}"/ecompress --dequeue
+	fi
+
+	if has chflags ${FEATURES}; then
+		# Restore all the file flags that were saved earlier on.
+		mtree -U -e -p "${ED}" -k flags < "${T}/bsdflags.mtree" &> /dev/null
+	fi
 }
 
 preinst_qa_check() {
