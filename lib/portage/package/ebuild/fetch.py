@@ -37,12 +37,13 @@ from portage.data import portage_gid, portage_uid, secpass, userpriv_groups
 from portage.exception import FileNotFound, OperationNotPermitted, \
 	PortageException, TryAgain
 from portage.localization import _
-from portage.locks import lockfile, unlockfile
 from portage.output import colorize, EOutput
 from portage.util import apply_recursive_permissions, \
 	apply_secpass_permissions, ensure_dirs, grabdict, shlex_split, \
 	varexpand, writemsg, writemsg_level, writemsg_stdout
+from portage.util._eventloop.global_event_loop import global_event_loop
 from portage.process import spawn
+from _emerge.AsynchronousLock import _LockProcess
 
 _userpriv_spawn_kwargs = (
 	("uid",    portage_uid),
@@ -646,6 +647,13 @@ def fetch(myuris, mysettings, listonly=0, fetchonly=0,
 				if fetchonly:
 					lock_kwargs["flags"] = os.O_NONBLOCK
 
+				logname = None
+				if "userfetch" in settings.features and \
+					os.getuid() == 0 and portage_gid and portage_uid and \
+					hasattr(os, "setgroups"):
+					kwargs.update(_userpriv_spawn_kwargs)
+
+				file_lock = _LockProcess(scheduler=global_event_loop(), **_userpriv_spawn_kwargs)
 				try:
 					file_lock = lockfile(myfile_path,
 						wantnewlockfile=1, **lock_kwargs)

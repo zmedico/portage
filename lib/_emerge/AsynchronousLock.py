@@ -179,7 +179,7 @@ class _LockProcess(AbstractPollTask):
 	lock and exit.
 	"""
 
-	__slots__ = ('path',) + \
+	__slots__ = ('gid', 'groups', 'path', 'uid', 'umask') + \
 		('_acquired', '_kill_test', '_proc', '_files', '_unlock_future')
 
 	def _start(self):
@@ -209,7 +209,11 @@ class _LockProcess(AbstractPollTask):
 				os.path.join(portage._bin_path, 'lock-helper.py'), self.path],
 				env=dict(os.environ, PORTAGE_PYM_PATH=portage._pym_path),
 				fd_pipes={0:out_pr, 1:in_pw, 2:sys.__stderr__.fileno()},
-				scheduler=self.scheduler)
+				scheduler=self.scheduler,
+			gid=self.gid,
+			groups=self.groups,
+			uid=self.uid,
+			umask=self.umask)
 		self._proc.addExitListener(self._proc_exit)
 		self._proc.start()
 		os.close(out_pr)
