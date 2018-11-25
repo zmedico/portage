@@ -586,11 +586,13 @@ class RsyncSync(NewBase):
 		# user. We assume that PORTAGE_TMPDIR will satisfy this
 		# requirement, since that's not necessarily true for the
 		# default directory used by the tempfile module.
+		print('self.usersync_uid', self.usersync_uid)
 		if self.usersync_uid is not None:
 			tmpdir = self.settings['PORTAGE_TMPDIR']
 		else:
 			# use default dir from tempfile module
 			tmpdir = None
+		print('tmpdir', tmpdir, None if tmpdir is None else os.path.exists(tmpdir), flush=True)
 		fd, tmpservertimestampfile = \
 			tempfile.mkstemp(dir=tmpdir)
 		os.close(fd)
@@ -612,6 +614,7 @@ class RsyncSync(NewBase):
 					portage.exception.AlarmSignal.register(
 						self.rsync_initial_timeout)
 
+				print(command, flush=True)
 				pids.extend(portage.process.spawn(
 					command, returnpid=True,
 					**self.spawn_kwargs))
@@ -699,6 +702,7 @@ class RsyncSync(NewBase):
 
 				exitcode = None
 				try:
+					print(command, flush=True)
 					exitcode = portage.process.spawn(command,
 						**self.spawn_kwargs)
 				finally:

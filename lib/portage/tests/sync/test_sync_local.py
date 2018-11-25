@@ -28,7 +28,7 @@ class SyncLocalTestCase(TestCase):
 			return "git: command not found"
 
 	def testSyncLocal(self):
-		debug = False
+		debug = True
 
 		skip_reason = self._must_skip()
 		if skip_reason:
@@ -47,6 +47,7 @@ class SyncLocalTestCase(TestCase):
 			sync-rcu = %(sync-rcu)s
 			sync-rcu-store-dir = %(EPREFIX)s/var/repositories/test_repo_rcu_storedir
 			auto-sync = %(auto-sync)s
+			sync-user = %(sync-user)s
 			%(repo_extra_keys)s
 		""")
 
@@ -72,6 +73,9 @@ class SyncLocalTestCase(TestCase):
 		distdir = os.path.join(eprefix, "distdir")
 		repo = settings.repositories["test_repo"]
 		metadata_dir = os.path.join(repo.location, "metadata")
+		portage.util.apply_permissions(os.path.dirname(repo.location),
+			uid=int(portage.data.portage_uid),
+			gid=int(portage.data.portage_gid))
 
 		cmds = {}
 		for cmd in ("emerge", "emaint"):
@@ -92,14 +96,15 @@ class SyncLocalTestCase(TestCase):
 		committer_email = "gentoo-dev@gentoo.org"
 
 		def repos_set_conf(sync_type, dflt_keys=None, xtra_keys=None,
-			auto_sync="yes", sync_rcu=False, sync_depth=None):
+			auto_sync="yes", sync_rcu=False, sync_depth=None, sync_user=None):
 			env["PORTAGE_REPOSITORIES"] = repos_conf % {\
 				"EPREFIX": eprefix, "sync-type": sync_type,
 				"sync-depth": 0 if sync_depth is None else sync_depth,
 				"sync-rcu": "yes" if sync_rcu else "no",
 				"auto-sync": auto_sync,
 				"default_keys": "" if dflt_keys is None else dflt_keys,
-				"repo_extra_keys": "" if xtra_keys is None else xtra_keys}
+				"repo_extra_keys": "" if xtra_keys is None else xtra_keys,
+				"sync-user": os.environ.get("PORTAGE_USERNAME", "portage") if sync_user is None else sync_user}
 
 		def alter_ebuild():
 			with open(os.path.join(repo.location + "_sync",
@@ -236,6 +241,10 @@ class SyncLocalTestCase(TestCase):
 
 		sync_rsync_rcu = (
 			(homedir, lambda: repos_set_conf("rsync", sync_rcu=True)),
+			(homedir, lambda: ensure_dirs(os.path.join(eprefix, 'var/repositories/test_repo_rcu_storedir'),
+								uid=int(portage.data.portage_uid),
+								gid=int(portage.data.portage_gid))),
+
 		)
 
 		pythonpath =  os.environ.get("PYTHONPATH")
@@ -254,12 +263,13 @@ class SyncLocalTestCase(TestCase):
 		env = {
 			"PORTAGE_OVERRIDE_EPREFIX" : eprefix,
 			"DISTDIR" : distdir,
+			"FEATURES": "usersync",
 			"GENTOO_COMMITTER_NAME" : committer_name,
 			"GENTOO_COMMITTER_EMAIL" : committer_email,
 			"HOME" : homedir,
 			"PATH" : os.environ["PATH"],
-			"PORTAGE_GRPNAME" : os.environ["PORTAGE_GRPNAME"],
-			"PORTAGE_USERNAME" : os.environ["PORTAGE_USERNAME"],
+			"PORTAGE_GRPNAME" : os.environ.get("PORTAGE_GRPNAME", "portage"),
+			"PORTAGE_USERNAME" : os.environ.get("PORTAGE_USERNAME", "portage"),
 			"PYTHONDONTWRITEBYTECODE" : os.environ.get("PYTHONDONTWRITEBYTECODE", ""),
 			"PYTHONPATH" : pythonpath,
 		}
@@ -267,7 +277,7 @@ class SyncLocalTestCase(TestCase):
 
 		if os.environ.get("SANDBOX_ON") == "1":
 			# avoid problems from nested sandbox instances
-			env["FEATURES"] = "-sandbox -usersandbox"
+			env["FEATURES"] += " -sandbox -usersandbox"
 
 		dirs = [homedir, metadata_dir]
 		try:

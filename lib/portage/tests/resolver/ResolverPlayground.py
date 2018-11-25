@@ -76,6 +76,7 @@ class ResolverPlayground(object):
 		self.debug = debug
 		if eprefix is None:
 			self.eprefix = normalize_path(tempfile.mkdtemp())
+			os.chmod(self.eprefix, 0o755)
 		else:
 			self.eprefix = normalize_path(eprefix)
 
@@ -211,6 +212,14 @@ class ResolverPlayground(object):
 			tmpsettings['O'] = ebuild_dir
 			if not digestgen(mysettings=tmpsettings, myportdb=portdb):
 				raise AssertionError('digest creation failed for %s' % ebuild_path)
+
+		for repo, repo_info in self._repositories.items():
+			location = repo_info.get('location')
+			if location is not None:
+				print(location, flush=True)
+				portage.util.apply_recursive_permissions(location,
+					uid=int(portage.data.portage_uid),
+					gid=int(portage.data.portage_gid))
 
 	def _create_binpkgs(self, binpkgs):
 		# When using BUILD_ID, there can be mutiple instances for the
