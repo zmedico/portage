@@ -6,6 +6,7 @@
 import atexit
 import errno
 import fcntl
+import multiprocessing
 import platform
 import signal
 import socket
@@ -546,6 +547,13 @@ def _exec(binary, mycommand, opt_name, fd_pipes,
 					flags |= CLONE_NEWPID | CLONE_NEWNS
 
 				try:
+					p = multiprocessing.Process(
+						target=_unshare_subprocess,
+						args=(libc.unshare, flags))
+					p.start()
+					p.join()
+					if p.exitcode != 0:
+						raise AttributeError('unshare')
 					if libc.unshare(flags) != 0:
 						writemsg("Unable to unshare: %s\n" % (
 							errno.errorcode.get(ctypes.get_errno(), '?')),
@@ -625,6 +633,15 @@ def _exec(binary, mycommand, opt_name, fd_pipes,
 
 	# And switch to the new process.
 	os.execve(binary, myargs, env)
+
+
+def _unshare_subprocess(unshare, flags):
+	if unshare(flags) != 0:
+		writemsg("Unable to unshare: %s\n" % (
+			errno.errorcode.get(ctypes.get_errno(), '?')),
+			noiselevel=-1)
+		raise SystemExit(1)
+
 
 def _setup_pipes(fd_pipes, close_fds=True, inheritable=None):
 	"""Setup pipes for a forked process.
