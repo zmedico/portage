@@ -56,7 +56,9 @@ class SlotOperatorRequiredUseTestCase(TestCase):
 			ResolverPlaygroundTestCase(
 				["app-misc/A"],
 				success = False,
-				required_use_unsatisfied = ['app-misc/B:0']
+				# This used to be reported as app-misc/B:0, from
+				# the @__auto_slot_operator_replace_installed__ set.
+				required_use_unsatisfied = ['app-misc/B']
 			),
 
 		)

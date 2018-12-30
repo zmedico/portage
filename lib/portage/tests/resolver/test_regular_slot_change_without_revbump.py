@@ -40,7 +40,8 @@ class RegularSlotChangeWithoutRevBumpTestCase(TestCase):
 			# different from the installed slot (0 instead of 1.52).
 			ResolverPlaygroundTestCase(
 				["app-office/libreoffice"],
-				options = {"--oneshot": True, "--usepkg": True},
+				# TODO: maybe trigger the rebuild even without --deep=1
+				options = {"--oneshot": True, "--usepkg": True, "--deep": 1},
 				success = True,
 				mergelist = [
 					'dev-libs/boost-1.52.0',

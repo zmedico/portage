@@ -602,13 +602,18 @@ class depgraph(object):
 		self._dynamic_config = _dynamic_depgraph_config(self, myparams,
 			allow_backtracking, backtrack_parameters)
 		self._rebuild = _rebuild_config(frozen_config, backtrack_parameters)
-
-		self._select_atoms = self._select_atoms_highest_available
-		self._select_package = self._select_pkg_highest_available
+		self._dynamic_config._select_package = 'default'
 
 		self._event_loop = asyncio._safe_loop()
 
 		self._select_atoms_parent = None
+
+		self._select_pkg_map = {
+			'resume': self._select_pkg_from_graph,
+			'remove': self._select_pkg_from_installed,
+			'complete': self._select_pkg_from_graph,
+			'default': self._select_pkg_highest_available,
+		}
 
 		self.query = UserQuery(myopts).query
 
@@ -729,6 +734,11 @@ class depgraph(object):
 			if s.force_reinstall:
 				root = s.root_config.root
 				atoms.setdefault(root, set()).update(s.pset)
+
+		# These atoms do not actually force rebuilds, since the matched
+		# package could be uninstalled in order to solve a conflict.
+		for root, atom in self._dynamic_config._slot_operator_replace_installed:
+			atoms.setdefault(root, set()).add(atom)
 
 		if debug:
 			writemsg_level("forced reinstall atoms:\n",
@@ -1841,6 +1851,26 @@ class depgraph(object):
 					self._slot_operator_update_backtrack(dep,
 						new_dep=new_dep)
 					found_update = True
+				elif parent.installed and not self._equiv_ebuild_visible(parent):
+					backtrack_infos = self._dynamic_config._backtrack_infos
+					config = backtrack_infos.setdefault("config", {})
+					# mask unwanted binary packages if necessary
+					masks = {}
+					masks.setdefault(parent, {})["slot_operator_mask_built"] = None
+					config.setdefault("slot_operator_mask_built", {}).update(masks)
+
+					# trigger replacement of installed packages if necessary
+					reinstalls = set()
+					if parent.installed:
+						replacement_atom = self._replace_installed_atom(parent)
+						if replacement_atom is not None:
+							reinstalls.add((parent.root, replacement_atom))
+					if reinstalls:
+						config.setdefault("slot_operator_replace_installed",
+							set()).update(reinstalls)
+
+					self._dynamic_config._need_restart = True
+					found_update = True
 
 		return found_update
 
@@ -1906,7 +1936,7 @@ class depgraph(object):
 
 		# mask unwanted binary packages if necessary
 		masks = {}
-		if not child.installed:
+		if True or not child.installed:
 			masks.setdefault(dep.child, {})["slot_operator_mask_built"] = None
 		if masks:
 			config.setdefault("slot_operator_mask_built", {}).update(masks)
@@ -1950,9 +1980,9 @@ class depgraph(object):
 		# mask unwanted binary packages if necessary
 		abi_masks = {}
 		if new_child_slot is None:
-			if not child.installed:
+			if True or not child.installed:
 				abi_masks.setdefault(child, {})["slot_operator_mask_built"] = None
-		if not dep.parent.installed:
+		if True or not dep.parent.installed:
 			abi_masks.setdefault(dep.parent, {})["slot_operator_mask_built"] = None
 		if abi_masks:
 			config.setdefault("slot_operator_mask_built", {}).update(abi_masks)
@@ -2131,11 +2161,10 @@ class depgraph(object):
 
 				if not atom.package:
 					unevaluated_atom = None
-					if atom.match(dep.child):
-						# We are searching for a replacement_parent
-						# atom that will pull in a different child,
-						# so continue checking the rest of the atoms.
-						continue
+					# Process this atom as usual, since negative matches filter
+					# out candidates (needed for SonameSkipUpdateTestCase where
+					# a replacement_parent has an soname dependency that is not
+					# satisfied by a child candidate).
 				else:
 
 					if atom.blocker or \
@@ -2549,7 +2578,7 @@ class depgraph(object):
 					best_version = pkg
 			return best_version.slot_atom
 
-		return None
+		return inst_pkg.slot_atom
 
 	def _slot_operator_trigger_reinstalls(self):
 		"""
@@ -4291,8 +4320,8 @@ class depgraph(object):
 			atom_list.append((root, '__auto_rebuild__', atom))
 		for root, atom in self._rebuild.reinstall_list:
 			atom_list.append((root, '__auto_reinstall__', atom))
-		for root, atom in self._dynamic_config._slot_operator_replace_installed:
-			atom_list.append((root, '__auto_slot_operator_replace_installed__', atom))
+		#for root, atom in self._dynamic_config._slot_operator_replace_installed:
+		#	atom_list.append((root, '__auto_slot_operator_replace_installed__', atom))
 
 		set_dict = {}
 		for root, set_name, atom in atom_list:
@@ -4603,6 +4632,14 @@ class depgraph(object):
 			depgraph_sets.sets['__non_set_args__'].update(
 				non_set_atoms.get(root, []))
 
+		replace_installed_atoms = collections.defaultdict(set)
+		for root, atom in self._dynamic_config._slot_operator_replace_installed:
+			replace_installed_atoms[root].add(atom)
+
+		self._dynamic_config._slot_operator_replace_installed_sets = {}
+		for root, atoms in replace_installed_atoms.items():
+			self._dynamic_config._slot_operator_replace_installed_sets[root] = InternalPackageSet(initial_atoms=atoms)
+
 		# Invalidate the package selection cache, since
 		# arguments influence package selections.
 		self._dynamic_config._highest_pkg_cache.clear()
@@ -4694,6 +4731,69 @@ class depgraph(object):
 		return [pkg.slot_atom for pkg in greedy_pkgs \
 			if pkg not in discard_pkgs]
 
+	def _select_package(self, root, atom, onlydeps=False, parent=None):
+		select_package = self._dynamic_config._select_package
+
+		pkg, in_graph = self._select_pkg_map[select_package](root, atom, onlydeps=onlydeps, parent=parent)
+
+		# FIXME: When applying runtime package masks, consumers of the masked
+		# packages need to be able to select new packages that aren't in the
+		# graph yet, but _complete_graph restricts the package selection to
+		# packages already installed or in the graph.
+		if select_package != 'default' and pkg in self._dynamic_config._runtime_pkg_mask and pkg.root in self._dynamic_config._slot_operator_replace_installed_sets:
+			replacement_atom = self._dynamic_config._slot_operator_replace_installed_sets[pkg.root].findAtomForPackage(pkg)
+			if replacement_atom is not None:
+				new_pkg, in_graph = self._select_pkg_highest_available(root, atom, onlydeps=onlydeps, parent=parent)
+				if new_pkg is not in_graph:
+					# When pkg is in_graph, behave in a backward compatible
+					# manner (avoid breaking _compute_abi_rebuild_info).
+					return new_pkg, in_graph
+
+		return (pkg, in_graph)
+
+	def _select_atoms(self, root, depstring,
+		myuse=None, parent=None, strict=True, trees=None, priority=None):
+
+		has_replacement = False
+		if not (isinstance(parent, Package) and not parent.installed):
+			select_package = self._dynamic_config._select_package
+			if select_package != 'default':
+				selected_atoms = self._select_atoms_from_graph(root, depstring,
+					myuse=myuse, parent=parent, strict=strict, trees=trees, priority=priority)
+
+				replacement_atom = None
+				if isinstance(parent, Package) and parent.installed and root in self._dynamic_config._slot_operator_replace_installed_sets:
+					root_config = self._frozen_config.roots[root]
+					for atom, child in self._minimize_children(
+						parent, priority, root_config, selected_atoms[parent]):
+						if child is None:
+							# FIXME: could this be a package to replace, with no replacement available?
+							continue
+						replacement_atom = self._dynamic_config._slot_operator_replace_installed_sets[root].findAtomForPackage(child)
+						if replacement_atom is not None:
+							break
+					else:
+						# TODO: check virtual dependencies
+						pass
+
+				if replacement_atom is None:
+					return selected_atoms
+				has_replacement = True
+
+		try:
+			select_package_restore = None
+			if has_replacement:
+				# FIXME: Return a subclass of dict, tagged so that _wrapped_add_pkg_dep_string
+				# can select dep.child appropriately when it's not in the graph yet. It might
+				# make an adjustment for dep.depth too.
+				select_package_restore = self._dynamic_config._select_package
+				self._dynamic_config._select_package = 'default'
+			return self._select_atoms_highest_available(root, depstring,
+				myuse=myuse, parent=parent, strict=strict, trees=trees, priority=priority)
+		finally:
+			if select_package_restore is not None:
+				self._dynamic_config._select_package = select_package_restore
+
 	def _select_atoms_from_graph(self, *pargs, **kwargs):
 		"""
 		Prefer atoms matching packages that have already been
@@ -4725,8 +4825,12 @@ class depgraph(object):
 			ignore_built_slot_operator_deps(depstring)
 
 		pkgsettings = self._frozen_config.pkgsettings[root]
+		runtime_pkg_mask_contains = None
 		if trees is None:
 			trees = self._dynamic_config._filtered_trees
+			# FIXME: maybe this is sometimes needed in the other case too?
+			runtime_pkg_mask_contains = self._dynamic_config._runtime_pkg_mask.__contains__
+
 		mytrees = trees[root]
 		atom_graph = digraph()
 		if True:
@@ -4747,6 +4851,7 @@ class depgraph(object):
 				mytrees.pop("parent", None)
 				mytrees.pop("atom_graph", None)
 				mytrees.pop("priority", None)
+				mytrees.pop("runtime_pkg_mask_contains", None)
 
 				mytrees["pkg_use_enabled"] = self._pkg_use_enabled
 				if parent is not None:
@@ -4755,6 +4860,8 @@ class depgraph(object):
 					mytrees["atom_graph"] = atom_graph
 				if priority is not None:
 					mytrees["priority"] = priority
+				if runtime_pkg_mask_contains is not None:
+					mytrees["runtime_pkg_mask_contains"] = runtime_pkg_mask_contains
 
 				mycheck = portage.dep_check(depstring, None,
 					pkgsettings, myuse=myuse,
@@ -4767,6 +4874,7 @@ class depgraph(object):
 				mytrees.pop("parent", None)
 				mytrees.pop("atom_graph", None)
 				mytrees.pop("priority", None)
+				mytrees.pop("runtime_pkg_mask_contains", None)
 				mytrees.update(backup_state)
 			if not mycheck[0]:
 				raise portage.exception.InvalidDependString(mycheck[1])
@@ -5754,6 +5862,10 @@ class depgraph(object):
 					return False
 		except InvalidDependString:
 			pass
+
+		if (pkg.root in self._dynamic_config._slot_operator_replace_installed_sets and
+			self._dynamic_config._slot_operator_replace_installed_sets[pkg.root].findAtomForPackage(pkg)):
+			return False
 
 		if "selective" in self._dynamic_config.myparams:
 			return True
@@ -6751,6 +6863,7 @@ class depgraph(object):
 								matches = unmasked
 
 		pkg = matches[-1] # highest match
+
 		in_graph = next(self._dynamic_config._package_tracker.match(
 			root, pkg.slot_atom, installed=False), None)
 
@@ -6846,11 +6959,10 @@ class depgraph(object):
 		# parameter so that all dependencies are traversed and
 		# accounted for.
 		self._dynamic_config._complete_mode = True
-		self._select_atoms = self._select_atoms_from_graph
 		if "remove" in self._dynamic_config.myparams:
-			self._select_package = self._select_pkg_from_installed
+			self._dynamic_config._select_package = 'remove'
 		else:
-			self._select_package = self._select_pkg_from_graph
+			self._dynamic_config._select_package = 'complete'
 			self._dynamic_config._traverse_ignored_deps = True
 		already_deep = self._dynamic_config.myparams.get("deep") is True
 		if not already_deep:
@@ -9202,7 +9314,7 @@ class depgraph(object):
 			self._dynamic_config._serialized_tasks_cache = serialized_tasks
 			self._dynamic_config._scheduler_graph = self._dynamic_config.digraph
 		else:
-			self._select_package = self._select_pkg_from_graph
+			self._dynamic_config._select_package = 'resume'
 			self._dynamic_config.myparams["selective"] = True
 			# Always traverse deep dependencies in order to account for
 			# potentially unsatisfied dependencies of installed packages.

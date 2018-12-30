@@ -367,6 +367,12 @@ def dep_zapdeps(unreduced, reduced, myroot, use_binaries=0, trees=None,
 	pkg_use_enabled = trees[myroot].get("pkg_use_enabled")
 	want_update_pkg = trees[myroot].get("want_update_pkg")
 	downgrade_probe = trees[myroot].get("downgrade_probe")
+	# FIXME: When applying runtime package masks, consumers of the masked
+	# packages need to be able to select new packages that aren't in the
+	# graph yet, but _complete_graph restricts the package selection to
+	# packages already installed or in the graph.
+	runtime_pkg_mask_contains = trees[myroot].get("runtime_pkg_mask_contains") or (lambda pkg: False)
+	#runtime_pkg_mask_contains = lambda pkg: False
 	vardb = None
 	if "vartree" in trees[myroot]:
 		vardb = trees[myroot]["vartree"].dbapi
@@ -414,7 +420,7 @@ def dep_zapdeps(unreduced, reduced, myroot, use_binaries=0, trees=None,
 			if avail_pkg:
 				avail_pkg = avail_pkg[-1] # highest (ascending order)
 				avail_slot = Atom("%s:%s" % (atom.cp, avail_pkg.slot))
-			if not avail_pkg:
+			if not avail_pkg or runtime_pkg_mask_contains(avail_pkg):
 				all_available = False
 				all_use_satisfied = False
 				break
@@ -529,7 +535,13 @@ def dep_zapdeps(unreduced, reduced, myroot, use_binaries=0, trees=None,
 				all_installed_slots = True
 				for slot_atom in slot_map:
 					# New-style virtuals have zero cost to install.
-					if not vardb.match(slot_atom) and \
+					vardb_match = vardb.match_pkgs(slot_atom)
+					vardb_mask = [pkg for pkg in vardb_match if runtime_pkg_mask_contains(pkg)]
+					if vardb_mask:
+						all_installed = False
+						all_installed_slots = False
+						break
+					if not vardb_match and \
 						not slot_atom.startswith("virtual/"):
 						all_installed_slots = False
 						break

@@ -53,7 +53,8 @@ class SlotChangeWithoutRevBumpTestCase(TestCase):
 			# without revbump needs to trigger a rebuild.
 			ResolverPlaygroundTestCase(
 				["kde-base/ark"],
-				options = {"--oneshot": True, "--usepkg": True},
+				# TODO: maybe trigger the rebuild even without --deep=1
+				options = {"--oneshot": True, "--usepkg": True, "--deep": 1},
 				success = True,
 				mergelist = ['app-arch/libarchive-3.1.1', "kde-base/ark-4.10.0"]),
 
