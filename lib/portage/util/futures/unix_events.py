@@ -37,10 +37,16 @@ from portage.util._eventloop.global_event_loop import (
 )
 from portage.util.futures import (
 	asyncio,
+	base_events,
+	constants,
 	events,
 )
 
 from portage.util.futures.transports import _FlowControlMixin
+from portage.util.futures.compat_coroutine import (
+	coroutine,
+	coroutine_return,
+)
 
 
 class _PortageEventLoop(events.AbstractEventLoop):
@@ -248,6 +254,80 @@ class _PortageEventLoop(events.AbstractEventLoop):
 
 	def _subprocess_transport_failure(self, result, exception, wait_transp):
 		result.set_exception(wait_transp.exception() or exception)
+
+	@coroutine
+	def create_unix_server(
+			self, protocol_factory, path=None,
+			sock=None, backlog=100, ssl=None,
+			ssl_handshake_timeout=None,
+			start_serving=True):
+		if isinstance(ssl, bool):
+			raise TypeError('ssl argument must be an SSLContext or None')
+
+		if ssl_handshake_timeout is not None and not ssl:
+			raise ValueError(
+				'ssl_handshake_timeout is only meaningful with ssl')
+
+		if path is not None:
+			if sock is not None:
+				raise ValueError(
+					'path and sock can not be specified at the same time')
+
+			if hasattr(os, 'fspath'):
+				path = os.fspath(path)
+			sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+
+			# Check for abstract socket. `str` and `bytes` paths are supported.
+			if path[0] not in (0, '\x00'):
+				try:
+					if stat.S_ISSOCK(os.stat(path).st_mode):
+						os.remove(path)
+				except OSError as err:
+					if err.errno != errno.ENOENT:
+						raise
+					# Directory may have permissions only to create socket.
+					#logger.error('Unable to check or remove stale UNIX socket '
+					#			 '%r: %r', path, err)
+
+			try:
+				sock.bind(path)
+			except OSError as exc:
+				sock.close()
+				if exc.errno == errno.EADDRINUSE:
+					# Let's improve the error message by adding
+					# with what exact address it occurs.
+					msg = 'Address {} is already in use'.format(path)
+					raise OSError(errno.EADDRINUSE, msg)
+				else:
+					raise
+			except:
+				sock.close()
+				raise
+		else:
+			if sock is None:
+				raise ValueError(
+					'path was not specified, and no sock specified')
+
+			if (sock.family != socket.AF_UNIX or
+					sock.type != socket.SOCK_STREAM):
+				raise ValueError(
+					'A UNIX Domain Stream Socket was expected, got {}'.format(sock))
+
+		sock.setblocking(False)
+		server = base_events.Server(self, [sock], protocol_factory, ssl, backlog, ssl_handshake_timeout)
+		if start_serving:
+			server._start_serving()
+			# Skip one loop iteration so that all 'loop.add_reader'
+			# go through.
+			yield tasks.sleep(0, loop=self)
+
+		coroutine_return(server)
+
+	def _start_serving(self, protocol_factory, sock, bsslcontext=None, server=None, backlog=100, ssl_handshake_timeout=constants.SSL_HANDSHAKE_TIMEOUT):
+		raise NotImplementedError(self)
+		#self._add_reader(sock.fileno(), self._accept_connection,
+		#				 protocol_factory, sock, sslcontext, server, backlog,
+		#				 ssl_handshake_timeout)
 
 
 if hasattr(os, 'set_blocking'):

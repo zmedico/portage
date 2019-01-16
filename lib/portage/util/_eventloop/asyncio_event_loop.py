@@ -43,6 +43,7 @@ class AsyncioEventLoop(_AbstractEventLoop):
 		self.create_future = (loop.create_future
 			if hasattr(loop, 'create_future') else self._create_future)
 		self.create_task = loop.create_task
+		self.create_unix_server = loop.create_unix_server
 		self.add_reader = loop.add_reader
 		self.remove_reader = loop.remove_reader
 		self.add_writer = loop.add_writer

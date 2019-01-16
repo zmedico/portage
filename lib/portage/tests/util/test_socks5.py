@@ -2,6 +2,7 @@
 # Distributed under the terms of the GNU General Public License v2
 
 import functools
+import os
 import platform
 import shutil
 import socket
@@ -14,7 +15,10 @@ import portage
 from portage.tests import TestCase
 from portage.util._eventloop.global_event_loop import global_event_loop
 from portage.util import socks5
-from portage.const import PORTAGE_BIN_PATH
+from portage.const import (
+	PORTAGE_BIN_PATH,
+	PORTAGE_PYM_PATH,
+)
 
 try:
 	from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -188,10 +192,12 @@ class Socks5ServerTestCase(TestCase):
 		try:
 			with AsyncHTTPServer(host, {path: content}, loop) as server:
 
-				settings = {
+				settings = os.environ.copy()
+				settings.update({
 					'PORTAGE_TMPDIR': tempdir,
 					'PORTAGE_BIN_PATH': PORTAGE_BIN_PATH,
-				}
+					'PORTAGE_PYM_PATH': PORTAGE_PYM_PATH,
+				})
 
 				try:
 					proxy = socks5.get_socks5_proxy(settings)

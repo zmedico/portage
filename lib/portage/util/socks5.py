@@ -41,7 +41,11 @@ class ProxyManager(object):
 		self.socket_path = os.path.join(settings['PORTAGE_TMPDIR'],
 				'.portage.%d.net.sock' % os.getpid())
 		server_bin = os.path.join(settings['PORTAGE_BIN_PATH'], 'socks5-server.py')
-		spawn_kwargs = {}
+		if hasattr(settings, 'environ'):
+			env = settings.environ()
+		else:
+			env = settings
+		spawn_kwargs = {'env': env}
 		# The portage_uid check solves EPERM failures in Travis CI.
 		if portage.data.secpass > 1 and os.geteuid() != portage_uid:
 			spawn_kwargs.update(

@@ -3,25 +3,22 @@
 # Copyright 2015 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
-import asyncio
 import errno
+import functools
 import os
 import socket
 import struct
 import sys
+import traceback
 
-if hasattr(asyncio, 'ensure_future'):
-	# Python >=3.4.4.
-	asyncio_ensure_future = asyncio.ensure_future
-else:
-	# getattr() necessary because async is a keyword in Python >=3.7.
-	asyncio_ensure_future = getattr(asyncio, 'async')
+if 'PORTAGE_PYM_PATH' in os.environ:
+	sys.path.insert(0, os.environ['PORTAGE_PYM_PATH'])
 
-try:
-	current_task = asyncio.current_task
-except AttributeError:
-	# Deprecated since Python 3.7
-	current_task = asyncio.Task.current_task
+import portage
+from portage.util.futures.compat_coroutine import coroutine
+from portage.util.futures import asyncio
+
+asyncio_ensure_future = asyncio.ensure_future
 
 
 class Socks5Server(object):
@@ -29,8 +26,8 @@ class Socks5Server(object):
 	An asynchronous SOCKSv5 server.
 	"""
 
-	@asyncio.coroutine
-	def handle_proxy_conn(self, reader, writer):
+	@coroutine
+	def handle_proxy_conn(self, loop, reader, writer):
 		"""
 		Handle incoming client connection. Perform SOCKSv5 request
 		exchange, open a proxied connection and start relaying.
@@ -40,10 +37,9 @@ class Socks5Server(object):
 		@param writer: Write side of the socket
 		@type writer: asyncio.StreamWriter
 		"""
-
 		try:
 			# SOCKS hello
-			data = yield from reader.readexactly(2)
+			data = yield reader.readexactly(2)
 			vers, method_no = struct.unpack('!BB', data)
 
 			if vers != 0x05:
@@ -53,7 +49,7 @@ class Socks5Server(object):
 				return
 
 			# ...and auth method list
-			data = yield from reader.readexactly(method_no)
+			data = yield reader.readexactly(method_no)
 			for method in data:
 				if method == 0x00:
 					break
@@ -64,13 +60,13 @@ class Socks5Server(object):
 			# auth reply
 			repl = struct.pack('!BB', 0x05, method)
 			writer.write(repl)
-			yield from writer.drain()
+			yield writer.drain()
 			if method == 0xFF:
 				writer.close()
 				return
 
 			# request
-			data = yield from reader.readexactly(4)
+			data = yield reader.readexactly(4)
 			vers, cmd, rsv, atyp = struct.unpack('!BBBB', data)
 
 			if vers != 0x05 or rsv != 0x00:
@@ -83,31 +79,31 @@ class Socks5Server(object):
 			if cmd != 0x01:  # CONNECT
 				rpl = 0x07  # command not supported
 			elif atyp == 0x01:  # IPv4
-				data = yield from reader.readexactly(4)
+				data = yield reader.readexactly(4)
 				addr = socket.inet_ntoa(data)
 			elif atyp == 0x03:  # domain name
-				data = yield from reader.readexactly(1)
+				data = yield reader.readexactly(1)
 				addr_len, = struct.unpack('!B', data)
-				addr = yield from reader.readexactly(addr_len)
+				addr = yield reader.readexactly(addr_len)
 				try:
 					addr = addr.decode('idna')
 				except UnicodeDecodeError:
 					rpl = 0x04  # host unreachable
 
 			elif atyp == 0x04:  # IPv6
-				data = yield from reader.readexactly(16)
+				data = yield reader.readexactly(16)
 				addr = socket.inet_ntop(socket.AF_INET6, data)
 			else:
 				rpl = 0x08  # address type not supported
 
 			# try to connect if we can handle it
 			if rpl == 0x00:
-				data = yield from reader.readexactly(2)
+				data = yield reader.readexactly(2)
 				port, = struct.unpack('!H', data)
 
 				try:
 					# open a proxied connection
-					proxied_reader, proxied_writer = yield from asyncio.open_connection(
+					proxied_reader, proxied_writer = yield asyncio.open_connection(
 							addr, port)
 				except (socket.gaierror, socket.herror):
 					# DNS failure
@@ -150,7 +146,7 @@ class Socks5Server(object):
 			# reply to the request
 			repl = struct.pack('!BBB', 0x05, rpl, 0x00)
 			writer.write(repl + repl_addr)
-			yield from writer.drain()
+			yield writer.drain()
 
 			# close if an error occured
 			if rpl != 0x00:
@@ -159,42 +155,55 @@ class Socks5Server(object):
 
 			# otherwise, start two loops:
 			# remote -> local...
+			t_future = loop.create_future()
+			task = asyncio_ensure_future(self._handle_proxy_conn_loop(
+				loop, reader, writer, proxied_writer, t_future))
+
 			t = asyncio_ensure_future(self.handle_proxied_conn(
-					proxied_reader, writer, current_task()))
+				loop, proxied_reader, writer, task))
+			t_future.set_result(t)
+			yield task
+			yield t
 
-			# and local -> remote...
+		except asyncio.IncompleteReadError:
+			pass
+		except OSError as e:
+			traceback.print_exc()
+			pass
+		finally:
+			writer.close()
+
+	@coroutine
+	def _handle_proxy_conn_loop(self, loop, reader, writer, proxied_writer, t_future):
+
+		t = yield t_future
+
+		# and local -> remote...
+		try:
 			try:
-				try:
-					while True:
-						data = yield from reader.read(4096)
-						if data == b'':
-							# client disconnected, stop relaying from
-							# remote host
-							t.cancel()
-							break
+				while True:
+					data = yield reader.read(4096)
+					if data == b'':
+						# client disconnected, stop relaying from
+						# remote host
+						t.cancel()
+						break
 
-						proxied_writer.write(data)
-						yield from proxied_writer.drain()
-				except OSError:
-					# read or write failure
-					t.cancel()
-				except:
-					t.cancel()
-					raise
-			finally:
-				# always disconnect in the end :)
-				proxied_writer.close()
-				writer.close()
-
-		except (OSError, asyncio.IncompleteReadError, asyncio.CancelledError):
+					proxied_writer.write(data)
+					yield proxied_writer.drain()
+			except OSError as e:
+				# read or write failure
+				t.cancel()
+			except Exception as e:
+				t.cancel()
+				raise
+		finally:
+			# always disconnect in the end :)
+			proxied_writer.close()
 			writer.close()
-			return
-		except:
-			writer.close()
-			raise
 
-	@asyncio.coroutine
-	def handle_proxied_conn(self, proxied_reader, writer, parent_task):
+	@coroutine
+	def handle_proxied_conn(self, loop, proxied_reader, writer, parent_task):
 		"""
 		Handle the proxied connection. Relay incoming data
 		to the client.
@@ -208,16 +217,16 @@ class Socks5Server(object):
 		try:
 			try:
 				while True:
-					data = yield from proxied_reader.read(4096)
+					data = yield proxied_reader.read(4096)
 					if data == b'':
 						break
 
 					writer.write(data)
-					yield from writer.drain()
+					yield writer.drain()
 			finally:
 				parent_task.cancel()
 		except (OSError, asyncio.CancelledError):
-			return
+			raise
 
 
 if __name__ == '__main__':
@@ -226,17 +235,22 @@ if __name__ == '__main__':
 		sys.exit(1)
 
 	loop = asyncio.get_event_loop()
+	exit_future = loop.create_future()
 	s = Socks5Server()
 	server = loop.run_until_complete(
-		asyncio.start_unix_server(s.handle_proxy_conn, sys.argv[1], loop=loop))
+		asyncio.start_unix_server(
+		functools.partial(s.handle_proxy_conn, loop), sys.argv[1],
+		loop=(loop._loop if asyncio._asyncio_enabled else loop)))
 
 	ret = 0
 	try:
 		try:
-			loop.run_forever()
+			loop.run_until_complete(exit_future)
 		except KeyboardInterrupt:
 			pass
 		except:
+			exit_future.cancel()
+			raise
 			ret = 1
 	finally:
 		server.close()

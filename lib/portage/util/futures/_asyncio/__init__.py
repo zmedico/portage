@@ -16,6 +16,7 @@ __all__ = (
 	'get_event_loop_policy',
 	'set_event_loop_policy',
 	'sleep',
+	'start_unix_server',
 	'Task',
 	'wait',
 )
@@ -50,12 +51,42 @@ from portage.util.futures.futures import (
 	TimeoutError,
 )
 from portage.util.futures._asyncio.process import _Process
+
 from portage.util.futures._asyncio.tasks import (
 	ALL_COMPLETED,
 	FIRST_COMPLETED,
 	FIRST_EXCEPTION,
 	wait,
 )
+
+if _real_asyncio is not None:
+	start_unix_server = _real_asyncio.start_unix_server
+	open_connection = _real_asyncio.open_connection
+else:
+	from portage.util.futures._asyncio.streams import (
+		start_unix_server,
+		open_connection,
+	)
+
+try:
+	from asyncio import IncompleteReadError
+except ImportError:
+
+	class IncompleteReadError(EOFError):
+		"""
+		Incomplete read error. Attributes:
+
+		- partial: read bytes string before the end of stream was reached
+		- expected: total number of expected bytes (or None if unknown)
+		"""
+		def __init__(self, partial, expected):
+			super().__init__(
+				'{} bytes read on a total of {} expected bytes'.format(len(partial), expected))
+			self.partial = partial
+			self.expected = expected
+
+		def __reduce__(self):
+			return type(self), (self.partial, self.expected)
 
 
 _lock = threading.Lock()
