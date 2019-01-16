@@ -5,23 +5,37 @@
 
 import asyncio
 import errno
+import functools
+import logging
 import os
 import socket
 import struct
 import sys
 
-if hasattr(asyncio, 'ensure_future'):
-	# Python >=3.4.4.
-	asyncio_ensure_future = asyncio.ensure_future
-else:
-	# getattr() necessary because async is a keyword in Python >=3.7.
-	asyncio_ensure_future = getattr(asyncio, 'async')
+#if hasattr(asyncio, 'ensure_future'):
+#	# Python >=3.4.4.
+#	asyncio_ensure_future = asyncio.ensure_future
+#else:
+#	# getattr() necessary because async is a keyword in Python >=3.7.
+#	asyncio_ensure_future = getattr(asyncio, 'async')
 
 try:
 	current_task = asyncio.current_task
 except AttributeError:
 	# Deprecated since Python 3.7
 	current_task = asyncio.Task.current_task
+
+from portage.util.futures import asyncio
+from portage.util.futures.unix_events import _set_nonblocking
+
+asyncio_ensure_future = asyncio.ensure_future
+
+if not hasattr(asyncio, 'coroutine'):
+	import asyncio as _real_asyncio
+	asyncio.coroutine = _real_asyncio.coroutine
+	asyncio.start_server = _real_asyncio.start_server
+	asyncio.start_unix_server = _real_asyncio.start_unix_server
+	asyncio.open_connection = _real_asyncio.open_connection
 
 
 class Socks5Server(object):
@@ -220,26 +234,139 @@ class Socks5Server(object):
 			return
 
 
+def start_server(handle_proxy_conn, host, port, loop):
+	sockets = []
+	addrs = set()
+
+	for addrinfo in socket.getaddrinfo(
+		host, port,
+		family=socket.AF_INET, type=socket.SOCK_STREAM,
+		proto=socket.IPPROTO_TCP, flags=socket.AI_PASSIVE):
+
+		# Validate structures returned from getaddrinfo(),
+		# since they may be corrupt (especially if python
+		# has IPv6 support disabled).
+		if len(addrinfo) != 5:
+			continue
+		family, sock_type, proto, canonname, sockaddr = addrinfo
+		print('\n\n\n******* addrinfo', addrinfo, flush=True)
+		if len(sockaddr) < 2:
+			continue
+		if not isinstance(sockaddr[0], str):
+			continue
+		if sockaddr in addrs:
+			print('\n\n\n******* duplicate addr', sockaddr, flush=True)
+			continue
+
+		sock = None
+		try:
+			logging.debug('family=%s type=%s proto=%s addr=%s',
+				family, sock_type, proto, sockaddr)
+			sock = socket.socket(
+				family=family, type=sock_type, proto=proto)
+			sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+			if (hasattr(socket, 'AF_INET6') and
+				hasattr(socket, 'IPV6_V6ONLY') and
+				family == socket.AF_INET6):
+				# Avoid EADDRINUSE with dual ipv4/ipv6 stack.
+				print('\n\n************* IPV6_V6ONLY', flush=True)
+				sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+			print('\n\n************* begin bind', sockaddr, host, flush=True)
+			sock.bind(sockaddr)
+			sock.listen(socket.SOMAXCONN)
+			_set_nonblocking(sock.fileno())
+			print('\n\n************* bind complete', sockaddr, flush=True)
+			#import pdb
+			#pdb.set_trace()
+		except Exception as e:
+			# errno.EADDRINUSE
+			logging.exception(e)
+			if sock is not None:
+				sock.close()
+			continue
+		else:
+			sockets.append((sock, sockaddr))
+			addrs.add(sockaddr)
+			#break
+
+	if not sockets:
+		raise AssertionError('could not bind socket(s)')
+
+	class server_cls(object):
+
+		def __init__(self, sockets, loop):
+			self._sockets = sockets
+			self._done = loop.create_future()
+			self._loop = loop
+			self._connections = {}
+			for sock, addr in sockets:
+				print('\n\n************* add reader *****\n', flush=True)
+				#sock.bind(addr)
+				#sock.listen(self._args.backlog)
+				loop.add_reader(sock.fileno(), self._read_handler)
+
+		def close(self):
+			for s, addr in self._sockets:
+				s.close()
+			del self._sockets[:]
+
+		def wait_closed(self):
+			waiter = loop.create_future()
+			self._done.add_done_callback(waiter.set_result)
+			yield from waiter
+
+		def _read_handler(self):
+			print('\n\n************* accept *****\n', flush=True)
+			conn, addr = conn_addr = sock.accept()
+			self._connections[conn.fileno()] = conn_addr
+			self._loop.add_reader(sock.fileno(),
+				functools.partial(self._conn_read_handler, conn, addr))
+
+		def _conn_read_handler(self, conn, addr):
+			print('\n\n************* _conn_read_handler *****\n', flush=True)
+			handle_proxy_conn(None, None)
+
+            #self._loop.add_reader(sock.fileno(),
+            #    functools.partial(self._socket_read_handler, con, addr))
+			#if not self._done.done():
+			#	self._done.set_result(None)
+			#handle_proxy_conn()
+
+	return server_cls(sockets, loop)
+
+
 if __name__ == '__main__':
 	if len(sys.argv) != 2:
 		print('Usage: %s <socket-path>' % sys.argv[0])
 		sys.exit(1)
 
 	loop = asyncio.get_event_loop()
+	#host = '127.0.0.1'
+	host = 'localhost'
 	s = Socks5Server()
-	server = loop.run_until_complete(
-		asyncio.start_unix_server(s.handle_proxy_conn, sys.argv[1], loop=loop))
+	try:
+		server = loop.run_until_complete(
+			asyncio.start_server(s.handle_proxy_conn, host=host, port=9050,
+			loop=getattr(loop, '_asyncio_wrapper', loop)))
+	except NotImplementedError:
+		server = start_server(s.handle_proxy_conn, host, 9050,
+			loop)
 
 	ret = 0
 	try:
 		try:
+			print('\n\n************* loop.run_forever() *****\n', flush=True)
 			loop.run_forever()
 		except KeyboardInterrupt:
-			pass
+			#pass
+			raise
 		except:
 			ret = 1
 	finally:
-		server.close()
 		loop.run_until_complete(server.wait_closed())
+		server.close()
 		loop.close()
-		os.unlink(sys.argv[1])
+		if sys.argv[1].startswith('/'):
+			os.unlink(sys.argv[1])
+		print('\n\n************* loop exit *****\n', flush=True)
+	print('\n\n************* loop success *****\n', flush=True)
