@@ -2,6 +2,8 @@
 # Distributed under the terms of the GNU General Public License v2
 
 import functools
+import sys
+import traceback
 
 import portage
 portage.proxy.lazyimport.lazyimport(globals(),
@@ -122,6 +124,8 @@ class _GeneratorTask(object):
 				self._result.set_result(None)
 		except Exception as e:
 			if not self._result.cancelled():
+				if sys.version_info.major < 3:
+					traceback.print_exc()
 				self._result.set_exception(e)
 		else:
 			future = asyncio.ensure_future(future, loop=self._loop)
