@@ -162,6 +162,9 @@ class Backtracker(object):
 		# conflict.
 		self._feedback_slot_conflict(conflicts_data[0])
 
+	def _feedback_use_conflicts(self, conflicts_data):
+		self._feedback_use_conflict(conflicts_data[0])
+
 	def _feedback_slot_conflict(self, conflict_data):
 		for pkg, parent_atoms in conflict_data:
 			new_node = copy.deepcopy(self._current_node)
@@ -172,6 +175,8 @@ class Backtracker(object):
 				pkg, {})["slot conflict"] = parent_atoms
 			self._add(new_node)
 
+	def _feedback_use_conflict(self, conflict_data):
+		print('_feedback_use_conflict')
 
 	def _feedback_missing_dep(self, dep):
 		new_node = copy.deepcopy(self._current_node)
@@ -207,6 +212,9 @@ class Backtracker(object):
 					para.needed_use_config_changes[pkg] = (new_use, new_changes)
 			elif change == "slot_conflict_abi":
 				new_node.terminal = False
+			elif change == "use_conflict":
+				#new_node.terminal = False
+				pass
 			elif change == "slot_operator_mask_built":
 				para.slot_operator_mask_built.update(data)
 				for pkg, mask_reasons in data.items():
@@ -244,6 +252,9 @@ class Backtracker(object):
 		#with other conflicts.
 		if "config" in infos:
 			self._feedback_config(infos["config"], explore=(len(infos)==1))
+
+		if "use conflict" in infos:
+			self._feedback_use_conflicts(infos["use conflict"])
 
 		#There is at most one of the following types of conflicts for a given restart.
 		if "slot conflict" in infos:

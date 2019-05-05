@@ -499,6 +499,7 @@ class _dynamic_depgraph_config(object):
 		self._displayed_autounmask = False
 		self._success_without_autounmask = False
 		self._autounmask_backtrack_disabled = False
+		self._autounmask_use_conflicts = collections.defaultdict(list)
 		self._required_use_unsatisfied = False
 		self._traverse_ignored_deps = False
 		self._complete_mode = False
@@ -3039,6 +3040,28 @@ class depgraph(object):
 				self._check_slot_conflict(pkg, dep.atom)
 			if existing_node:
 				if existing_node_matches:
+					if dep.atom.use:
+						use_enabled = self._pkg_use_enabled(pkg)
+						if use_enabled is not pkg.use:
+							for other_parent_atom in self._dynamic_config._parent_atoms[pkg]:
+								other_pkg, other_atom = other_parent_atom
+								other_matches = other_atom.match(existing_node.with_use(use_enabled))
+								if not other_matches:
+									if debug:
+										writemsg_level(
+											"%s%s %s %s\n" % ("use conflict:".ljust(15),
+											other_atom,
+											pkg, pkg_use_display(pkg,
+											self._frozen_config.myopts,
+											modified_use=self._pkg_use_enabled(pkg))),
+											level=logging.DEBUG, noiselevel=-1)
+
+									self._dynamic_config._autounmask_use_conflicts[pkg].append(other_parent_atom)
+									if self._dynamic_config._allow_backtracking:
+										backtrack_infos = self._dynamic_config._backtrack_infos
+										config = backtrack_infos.setdefault("config", {})
+										config.setdefault("use_conflict", collections.defaultdict(list))[pkg].append(other_parent_atom)
+
 					# The existing node can be reused.
 					if pkg != existing_node:
 						pkg = existing_node
@@ -4460,6 +4483,10 @@ class depgraph(object):
 			not self._accept_blocker_conflicts()) or \
 			(self._dynamic_config._allow_backtracking and
 			"slot conflict" in self._dynamic_config._backtrack_infos):
+			return False, myfavorites
+
+		if self.autounmask_use_conflict():
+			self._dynamic_config._need_restart = True
 			return False, myfavorites
 
 		if self._rebuild.trigger_rebuilds():
@@ -9384,6 +9411,9 @@ class depgraph(object):
 		"""
 
 	def need_restart(self):
+		writemsg('_need_restart _need_restart=%s _skip_restart=%s\n' % (
+			self._dynamic_config._need_restart,
+			self._dynamic_config._skip_restart))
 		return self._dynamic_config._need_restart and \
 			not self._dynamic_config._skip_restart
 
@@ -9392,6 +9422,9 @@ class depgraph(object):
 		Returns true if backtracking should terminate due to a needed
 		configuration change.
 		"""
+		if self._dynamic_config._allow_backtracking and self.autounmask_use_conflict():
+			return False
+
 		if (self._dynamic_config._success_without_autounmask or
 			self._dynamic_config._required_use_unsatisfied):
 			return True
@@ -9451,6 +9484,9 @@ class depgraph(object):
 		except self._autounmask_breakage:
 			return True
 		return False
+
+	def autounmask_use_conflict(self):
+		return any(pkg in self._dynamic_config.digraph for pkg in self._dynamic_config._autounmask_use_conflicts)
 
 	def get_backtrack_infos(self):
 		return self._dynamic_config._backtrack_infos
