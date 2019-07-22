@@ -16,7 +16,6 @@ portage.proxy.lazyimport.lazyimport(globals(),
 	'textwrap',
 	'_emerge.actions:load_emerge_config,run_action,' + \
 		'validate_ebuild_environment',
-	'_emerge.help:help@emerge_help',
 	'_emerge.is_valid_package_atom:insert_category_into_atom'
 )
 from portage import os
@@ -41,7 +40,7 @@ options=[
 "--newrepo",
 "--newuse",
 "--nodeps",       "--noreplace",
-"--nospinner",    "--oneshot",
+"--nospinner",
 "--onlydeps",     "--pretend",
 "--quiet-repo-display",
 "--quiet-unmerge-warn",
@@ -54,14 +53,12 @@ options=[
 ]
 
 shortmapping={
-"1":"--oneshot",
 "B":"--buildpkgonly",
 "c":"--depclean",
 "C":"--unmerge",
 "d":"--debug",
 "e":"--emptytree",
 "f":"--fetchonly", "F":"--fetch-all-uri",
-"h":"--help",
 "l":"--changelog",
 "n":"--noreplace", "N":"--newuse",
 "o":"--onlydeps",  "O":"--nodeps",
@@ -302,7 +299,7 @@ def parse_opts(tmpcmdline, silent=False):
 	myfiles=[]
 
 	actions = frozenset([
-		"clean", "check-news", "config", "depclean", "help",
+		"clean", "check-news", "config", "depclean",
 		"info", "list-sets", "metadata", "moo",
 		"prune", "rage-clean", "regen",  "search",
 		"sync",  "unmerge", "version",
@@ -592,6 +589,12 @@ def parse_opts(tmpcmdline, silent=False):
 			"action" : "append",
 		},
 
+		"--oneshot": {
+			"shortopt" : "-1",
+			"help"     : "Do not add the packages to the world file",
+			"action"  : "store_true"
+		},
+
 		"--onlydeps-with-rdeps": {
 			"help"    : "modify interpretation of depedencies",
 			"choices" : true_y_or_n
@@ -777,7 +780,7 @@ def parse_opts(tmpcmdline, silent=False):
 		},
 	}
 
-	parser = argparse.ArgumentParser(add_help=False)
+	parser = argparse.ArgumentParser()
 
 	for action_opt in actions:
 		parser.add_argument("--" + action_opt, action="store_true",
@@ -1219,7 +1222,6 @@ def emerge_main(args=None):
 
 	# optimize --help (no need to load config / EMERGE_DEFAULT_OPTS)
 	if myaction == "help":
-		emerge_help()
 		return os.EX_OK
 	elif myaction == "moo":
 		print(COWSAY_MOO % platform.system())
