@@ -124,6 +124,45 @@ class digraph(object):
 		except KeyError:
 			return False
 
+	def cmp_node_priority(self, n1, n2, ignore_priority=None):
+		"""
+		Compare edge priority for two nodes which may be connected by
+		circular edges. This can be used to order two nodes in ascending
+		order by relative edge priority.
+		"""
+		priorities1 = self.nodes[n1][0].get(n2) # n1 -> n2
+		priorities2 = self.nodes[n2][0].get(n1) # n2 -> n1
+		#print('\ncmp_node_priority priorities', n1, priorities1 if priorities1 is None else priorities1[-1], n2,
+		#	priorities2 if priorities2 is None else priorities2[-1], '\n', flush=True)
+
+		if ignore_priority is not None:
+			if priorities1 is not None and ignore_priority(priorities1[-1]):
+				priorities1 = None
+			if priorities2 is not None and ignore_priority(priorities2[-1]):
+				priorities2 = None
+
+		if priorities1 is not None and priorities2 is not None:
+			priorities1 = int(priorities1[-1])
+			priorities2 = int(priorities2[-1])
+
+			result = (priorities1 > priorities2) - (priorities1 < priorities2)
+
+		elif priorities1 is None and priorities2 is None:
+		#else:
+			# Don't return 1 or -1 for one-way direct relationships, since
+			# they can't be used to infer order for indirect relationships.
+			result = 0
+
+		elif priorities1 is None:
+			result = -1
+
+		else:
+			result = 1
+
+		#print('\ncmp_node_priority', result, n1, n2, '\n', flush=True)
+
+		return result
+
 	def remove_edge(self, child, parent):
 		"""
 		Remove edge in the direction from child to parent. Note that it is
