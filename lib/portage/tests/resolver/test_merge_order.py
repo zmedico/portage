@@ -319,7 +319,8 @@ class MergeOrderTestCase(TestCase):
 				["app-misc/some-app-c", "app-misc/circ-buildtime-a"],
 				success = True,
 				ambiguous_merge_order = True,
-				mergelist = [("app-misc/circ-buildtime-b-1", "app-misc/circ-buildtime-c-1"), "app-misc/circ-buildtime-a-1", "app-misc/some-app-c-1"]),
+				#mergelist = [("app-misc/circ-buildtime-b-1", "app-misc/circ-buildtime-a-1"), "app-misc/circ-buildtime-c-1", "app-misc/some-app-c-1"]),
+				mergelist = [('app-misc/circ-buildtime-b-1', 'app-misc/circ-buildtime-c-1', 'app-misc/circ-buildtime-a-1'), 'app-misc/some-app-c-1']),
 			# Test optimal merge order for a circular dep that is
 			# RDEPEND in one direction and PDEPEND in the other.
 			ResolverPlaygroundTestCase(
@@ -338,8 +339,9 @@ class MergeOrderTestCase(TestCase):
 				success = True,
 				all_permutations = True,
 				ambiguous_merge_order = True,
-				merge_order_assertions = (("app-misc/circ-satisfied-a-1", "app-misc/circ-satisfied-c-1"),),
-				mergelist = [("app-misc/circ-satisfied-a-1", "app-misc/circ-satisfied-b-1", "app-misc/circ-satisfied-c-1")]),
+				#merge_order_assertions = (("app-misc/circ-satisfied-a-1", "app-misc/circ-satisfied-c-1"),),
+				#mergelist = [("app-misc/circ-satisfied-a-1", "app-misc/circ-satisfied-b-1", "app-misc/circ-satisfied-c-1")]),
+				mergelist = [('app-misc/circ-satisfied-b-1', 'app-misc/circ-satisfied-c-1', 'app-misc/circ-satisfied-a-1')]),
 			# In the case of multiple runtime cycles, where some cycles
 			# may depend on smaller independent cycles, it's optimal
 			# to merge smaller independent cycles before other cycles
@@ -445,7 +447,8 @@ class MergeOrderTestCase(TestCase):
 				success = True,
 				all_permutations = True,
 				ambiguous_merge_order = True,
-				mergelist = ['sys-kernel/linux-headers-2.6.39', 'sys-devel/gcc-4.5.2', 'sys-libs/glibc-2.13', ('app-arch/xz-utils-5.0.2', 'sys-devel/binutils-2.20.1')]),
+				#mergelist = ['sys-kernel/linux-headers-2.6.39', 'sys-devel/gcc-4.5.2', 'sys-libs/glibc-2.13', ('app-arch/xz-utils-5.0.2', 'sys-devel/binutils-2.20.1')]),
+				mergelist = ['app-arch/xz-utils-5.0.2', 'sys-kernel/linux-headers-2.6.39', 'sys-devel/binutils-2.20.1', 'sys-devel/gcc-4.5.2', 'sys-libs/glibc-2.13']),
 			# Test asap install of PDEPEND for bug #180045.
 			ResolverPlaygroundTestCase(
 				["kde-base/kmines", "kde-base/kdnssd", "kde-base/kdelibs", "app-arch/xz-utils"],
@@ -469,10 +472,11 @@ class MergeOrderTestCase(TestCase):
 				mergelist = ['x11-base/xorg-server-1.14.1', 'media-libs/mesa-9.1.3']),
 		)
 
-		playground = ResolverPlayground(ebuilds=ebuilds, installed=installed)
+		playground = ResolverPlayground(ebuilds=ebuilds, installed=installed, debug=False)
 		try:
 			for test_case in test_cases:
 				playground.run_TestCase(test_case)
 				self.assertEqual(test_case.test_success, True, test_case.fail_msg)
 		finally:
+			playground.debug = False
 			playground.cleanup()

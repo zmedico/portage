@@ -124,6 +124,23 @@ class digraph(object):
 		except KeyError:
 			return False
 
+	def cmp_circular_bias(self, n1, n2):
+		priorities1 = self.nodes[n1][0].get(n2)
+		priorities2 = self.nodes[n2][0].get(n1)
+		if not (priorities1 or priorities2):
+			return 0
+
+		if not (priorities1 and priorities2):
+			if priorities1:
+				return 1
+			else:
+				return 0
+
+		priorities1 = int(priorities1[-1])
+		priorities2 = int(priorities2[-1])
+
+		return (priorities1 > priorities2) - (priorities1 < priorities2)
+
 	def remove_edge(self, child, parent):
 		"""
 		Remove edge in the direction from child to parent. Note that it is

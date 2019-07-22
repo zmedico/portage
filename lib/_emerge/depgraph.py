@@ -7572,6 +7572,9 @@ class depgraph(object):
 			measures such a strength bias within a circular
 			dependency relationship.
 			"""
+			result = mygraph.cmp_circular_bias(n1, n2)
+			#print('cmp_circular_bias', result, n1, n2)
+			#return result
 			n1_n2_medium = n2 in mygraph.child_nodes(n1,
 				ignore_priority=priority_range.ignore_medium_soft)
 			n2_n1_medium = n1 in mygraph.child_nodes(n2,
@@ -7758,6 +7761,7 @@ class depgraph(object):
 						if not mygraph.child_nodes(node,
 							ignore_priority=ignore_priority):
 							selected_nodes = [node]
+							#print('selected asap', node, flush=True)
 							asap_nodes.remove(node)
 							break
 					if selected_nodes:
@@ -7904,6 +7908,7 @@ class depgraph(object):
 							continue
 						# Merge PDEPEND asap for bug #180045.
 						asap_nodes.append(child)
+						#print('append asap', child, flush=True)
 
 			if selected_nodes and len(selected_nodes) > 1:
 				if not isinstance(selected_nodes, list):
@@ -8160,6 +8165,7 @@ class depgraph(object):
 			drop_satisfied = False
 
 			mygraph.difference_update(selected_nodes)
+			#print('selected_nodes', selected_nodes, flush=True)
 
 			for node in selected_nodes:
 				if isinstance(node, Package) and \
