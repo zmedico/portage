@@ -742,6 +742,11 @@ def parse_opts(tmpcmdline, silent=False):
 			"choices"  : true_y_or_n
 		},
 
+		"--use-conflict-backtrack": {
+			"help": "continue backtracking after a USE dependency conflict occurs",
+			"choices":("y", "n")
+		},
+
 		"--useoldpkg-atoms": {
 			"help"   :"A space separated list of package names or slot atoms. " + \
 				"Emerge will prefer matching binary packages over newer unbuilt packages. ",

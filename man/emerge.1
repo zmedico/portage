@@ -996,6 +996,14 @@ the command line are greedy, meaning that unspecific
 atoms may match multiple versions of slotted packages.
 This option also implies the \fB\-\-selective\fR option.
 .TP
+.BR "\-\-use\-conflict\-backtrack < y | n >"
+Allow backtracking after a USE dependency when a USE dependency.
+This option is not recommended, since it can cause a large amount
+of time to be wasted by backtracking calculations, even though there
+is no guarantee that it will produce a solution. Also, when combined
+with the \-\-autounmask option, use conflicts may trigger spurious
+autounmask configuration changes. This option is disabled by default.
+.TP
 .BR "\-\-use\-ebuild\-visibility [ y | n ]"
 Use unbuilt ebuild metadata for visibility
 checks on built packages.
