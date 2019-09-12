@@ -46,7 +46,7 @@ def create_depgraph_params(myopts, myaction):
 		myparams["ignore_built_slot_operator_deps"] = ignore_built_slot_operator_deps
 
 	myparams["ignore_soname_deps"] = myopts.get(
-		"--ignore-soname-deps", "y")
+		"--ignore-soname-deps", "n")
 
 	dynamic_deps = myopts.get("--dynamic-deps", "y") != "n" and "--nodeps" not in myopts
 	if dynamic_deps:
