@@ -6131,7 +6131,7 @@ class depgraph(object):
 					new_changes[real_flag] = False
 		new_use.update(old_use.difference(target_use))
 
-		def want_restart_for_use_change(pkg, new_use):
+		def want_restart_for_use_change(pkg, new_use, changes):
 			if pkg not in self._dynamic_config.digraph.nodes:
 				return False
 
@@ -6147,7 +6147,6 @@ class depgraph(object):
 			if not parent_atoms:
 				return False
 
-			new_use, changes = self._dynamic_config._needed_use_config_changes.get(pkg)
 			for ppkg, atom in parent_atoms:
 				if not atom.use:
 					continue
@@ -6180,6 +6179,10 @@ class depgraph(object):
 				any(x in pkg.use.force for x in new_changes):
 				return old_use
 
+			if want_restart_for_use_change(pkg, new_use, new_changes):
+				return old_use
+				#self._dynamic_config._need_restart = True
+
 			changes = _use_changes(new_use, new_changes,
 				required_use_satisfied=required_use_satisfied)
 			self._dynamic_config._needed_use_config_changes[pkg] = changes
@@ -6187,8 +6190,9 @@ class depgraph(object):
 			backtrack_infos.setdefault("config", {})
 			backtrack_infos["config"].setdefault("needed_use_config_changes", [])
 			backtrack_infos["config"]["needed_use_config_changes"].append((pkg, changes))
-			if want_restart_for_use_change(pkg, new_use):
-				self._dynamic_config._need_restart = True
+			#if want_restart_for_use_change(pkg, new_use):
+			#	self._dynamic_config._need_restart = True
+
 		return new_use
 
 	def _wrapped_select_pkg_highest_available_imp(self, root, atom, onlydeps=False, autounmask_level=None, parent=None):
