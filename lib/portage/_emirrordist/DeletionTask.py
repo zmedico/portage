@@ -34,6 +34,7 @@ class DeletionTask(CompositeTask):
 						logging.error(("rename %s from distfiles to "
 							"recycle failed: %s") % (self.distfile, e))
 				else:
+					self._success()
 					self.returncode = os.EX_OK
 					self._async_wait()
 					return
