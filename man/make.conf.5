@@ -1171,6 +1171,36 @@ ssh://ssh\-user@192.168.0.1:22/\\${HOME}/portage\-storage
 Note: For the ssh:// scheme, key\-based authentication might be of interest.
 .RE
 .TP
+\fBTRACK_KEYWORDS\fR = \fI[space delimited list of KEYWORDS]\fR
+Setting this variable to
+another arch's KEYWORDS allows the native arch to inherit the masking
+settings of another arch. However, what is nice about this functionality
+is that it still allows explicit -ARCH masking for your native arch
+in both KEYWORDS in ebuilds as well as profiles.
+
+So, for example, arm64 can track amd64 and have similar keyword masking,
+without the need to add "arm64" to KEYWORDS in all ebuilds.
+TRACK_KEYWORDS of "amd64 ~amd64" on an unstable arm64 system will mean
+that we effectively have an ACCEPT_KEYWORDS of "amd64 ~amd64 arm64 ~arm64".
+
+There is one exception to this rule and why we don't simply use ACCEPT_KEYWORDS for this
+purpose. With TRACK_KEYWORDS, it is still possible to have packages on an arch explicitly
+keyword masked via -arch, like "-arm64", to mask packages that we know don't work on
+arm64.
+
+If a package in our native arch is ever *explicitly* keyword masked via -arch via
+package.keywords in profiles or KEYWORDS in the ebuild, then it is truly masked on our
+arch as well *even if* it is unmasked on the TRACK_KEYWORDS arches. So we don't lose
+the functionality to explicitly tag ebuilds as being incompatible with our native arch,
+yet can still piggy-back on the keyword settings of another arch.
+
+This setting can be used by distribution maintainers as an interesting and more
+efficient alternative to having independent arch teams.
+
+.br
+Defaults to unset.
+.TP
+.TP
 \fBUNINSTALL_IGNORE\fR = \fI[space delimited list of fnmatch patterns]\fR
 This variable prevents uninstallation of files that match
 specific \fBfnmatch\fR(3) patterns. In order to ignore file

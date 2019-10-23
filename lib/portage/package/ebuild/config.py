@@ -1076,7 +1076,8 @@ class config(object):
 				self._locations_manager.profiles_complex,
 				self._locations_manager.abs_user_config,
 				self.local_config,
-				global_accept_keywords=self.configdict["defaults"].get("ACCEPT_KEYWORDS", ""))
+				global_accept_keywords=self.configdict["defaults"].get("ACCEPT_KEYWORDS", ""),
+				global_track_keywords=self.configdict["defaults"].get("TRACK_KEYWORDS", ""))
 		return self._keywords_manager_obj
 
 	@property
