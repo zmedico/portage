@@ -867,7 +867,8 @@ class ResolverPlaygroundResult(object):
 		if self.depgraph._dynamic_config._circular_dependency_handler is not None:
 			handler = self.depgraph._dynamic_config._circular_dependency_handler
 			sol = handler.solutions
-			self.circular_dependency_solutions = dict(zip([x.cpv for x in sol.keys()], sol.values()))
+			#self.circular_dependency_solutions = dict(zip([x.cpv for x in sol.keys()], sol.values()))
+			self.circular_dependency_solutions = None if sol is None else dict(zip([x.cpv for x in sol.keys()], sol.values()))
 
 		if self.depgraph._dynamic_config._unsatisfied_deps_for_display:
 			self.unsatisfied_deps = set(dep_info[0][1]
