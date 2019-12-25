@@ -81,6 +81,13 @@ class MergeOrderTestCase(TestCase):
 				"DEPEND": "app-misc/circ-satisfied-a",
 				"RDEPEND": "app-misc/circ-satisfied-a",
 			},
+			"app-misc/circ-direct-a-1": {
+				"RDEPEND": "app-misc/circ-direct-b",
+			},
+			"app-misc/circ-direct-b-1": {
+				"RDEPEND": "app-misc/circ-direct-a",
+				"DEPEND": "app-misc/circ-direct-a",
+			},
 			"app-misc/circ-smallest-a-1": {
 				"RDEPEND": "app-misc/circ-smallest-b",
 			},
@@ -220,6 +227,13 @@ class MergeOrderTestCase(TestCase):
 		}
 
 		installed = {
+			"app-misc/circ-direct-a-1": {
+				"RDEPEND": "app-misc/circ-direct-b",
+			},
+			"app-misc/circ-direct-b-1": {
+				"RDEPEND": "app-misc/circ-direct-a",
+				"DEPEND": "app-misc/circ-direct-a",
+			},
 			"app-misc/circ-buildtime-a-0": {},
 			"app-misc/circ-satisfied-a-0": {
 				"RDEPEND": "app-misc/circ-satisfied-b",
@@ -296,6 +310,14 @@ class MergeOrderTestCase(TestCase):
 
 		test_cases = (
 			ResolverPlaygroundTestCase(
+				["app-misc/circ-direct-a", "app-misc/circ-direct-b"],
+				success = True,
+				all_permutations = True,
+				mergelist = ["app-misc/circ-direct-a-1", "app-misc/circ-direct-b-1"],
+				#mergelist = None,
+				#circular_dependency_solutions = {},
+			),
+			ResolverPlaygroundTestCase(
 				["app-misc/some-app-a"],
 				success = True,
 				ambiguous_merge_order = True,
@@ -321,9 +343,8 @@ class MergeOrderTestCase(TestCase):
 				ambiguous_merge_order = True,
 				# The following merge order assertion reflects optimal order for
 				# a circular relationship which is DEPEND in one direction and
-				# RDEPEND in the other. The assertion currently fails, and the
-				# patch for bug 690436 will fix it.
-				#merge_order_assertions = (("app-misc/circ-buildtime-a-1", "app-misc/circ-buildtime-c-1"),),
+				# RDEPEND in the other.
+				merge_order_assertions = (("app-misc/circ-buildtime-a-1", "app-misc/circ-buildtime-c-1"),),
 				mergelist = [("app-misc/circ-buildtime-b-1", "app-misc/circ-buildtime-c-1", "app-misc/circ-buildtime-a-1"), "app-misc/some-app-c-1"]),
 			# Test optimal merge order for a circular dep that is
 			# RDEPEND in one direction and PDEPEND in the other.
@@ -474,10 +495,11 @@ class MergeOrderTestCase(TestCase):
 				mergelist = ['x11-base/xorg-server-1.14.1', 'media-libs/mesa-9.1.3']),
 		)
 
-		playground = ResolverPlayground(ebuilds=ebuilds, installed=installed)
+		playground = ResolverPlayground(ebuilds=ebuilds, installed=installed, debug=False)
 		try:
 			for test_case in test_cases:
 				playground.run_TestCase(test_case)
 				self.assertEqual(test_case.test_success, True, test_case.fail_msg)
 		finally:
+			playground.debug = False
 			playground.cleanup()

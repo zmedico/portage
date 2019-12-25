@@ -7646,21 +7646,6 @@ class depgraph(object):
 				break
 			removed_nodes.clear()
 		self._merge_order_bias(mygraph)
-		def cmp_circular_bias(n1, n2):
-			"""
-			RDEPEND is stronger than PDEPEND and this function
-			measures such a strength bias within a circular
-			dependency relationship.
-			"""
-			n1_n2_medium = n2 in mygraph.child_nodes(n1,
-				ignore_priority=priority_range.ignore_medium_soft)
-			n2_n1_medium = n1 in mygraph.child_nodes(n2,
-				ignore_priority=priority_range.ignore_medium_soft)
-			if n1_n2_medium == n2_n1_medium:
-				return 0
-			elif n1_n2_medium:
-				return 1
-			return -1
 		myblocker_uninstalls = self._dynamic_config._blocker_uninstalls.copy()
 		retlist=[]
 		# Contains uninstall tasks that have been scheduled to
@@ -7821,7 +7806,8 @@ class depgraph(object):
 			self._spinner_update()
 			selected_nodes = None
 			ignore_priority = None
-			if drop_satisfied or (prefer_asap and asap_nodes):
+			if prefer_asap and asap_nodes:
+			#if drop_satisfied or (prefer_asap and asap_nodes):
 				priority_range = DepPrioritySatisfiedRange
 			else:
 				priority_range = DepPriorityNormalRange
@@ -7902,8 +7888,21 @@ class depgraph(object):
 						if selected_nodes:
 							break
 
+			cycle_digraph = None
 			if not selected_nodes:
 				nodes = get_nodes(ignore_priority=priority_range.ignore_medium)
+				if not nodes:
+					if prefer_asap and asap_nodes:
+						# We failed to find any asap nodes to merge, so ignore
+						# them for the next iteration.
+						prefer_asap = False
+						continue
+
+				if drop_satisfied:
+					nodes = get_nodes(ignore_priority=DepPrioritySatisfiedRange.ignore_medium)
+					if nodes:
+						priority_range = DepPrioritySatisfiedRange
+						#print('\n\ndrop_satisfied', nodes, '\n\n', flush=True)
 				if nodes:
 					mergeable_nodes = set(nodes)
 					if prefer_asap and asap_nodes:
@@ -7924,11 +7923,19 @@ class depgraph(object):
 						if not mygraph.parent_nodes(node):
 							continue
 						selected_nodes = set()
-						if gather_deps(ignore_priority,
-							mergeable_nodes, selected_nodes, node):
-							if smallest_cycle is None or \
-								len(selected_nodes) < len(smallest_cycle):
-								smallest_cycle = selected_nodes
+						ranges = []
+						if priority_range is not DepPriorityNormalRange:
+							ranges.append(DepPriorityNormalRange)
+						ranges.append(priority_range)
+
+						for priority_range in ranges:
+							selected_nodes = set()
+							if gather_deps(priority_range.ignore_medium_soft,
+								mergeable_nodes, selected_nodes, node):
+								if smallest_cycle is None or \
+									len(selected_nodes) < len(smallest_cycle):
+									smallest_cycle = selected_nodes
+								break
 
 					selected_nodes = smallest_cycle
 
@@ -7987,15 +7994,31 @@ class depgraph(object):
 						asap_nodes.append(child)
 
 			if selected_nodes and len(selected_nodes) > 1:
+				# Sort nodes to account for direct circular relationships,
+				# such that DEPEND > RDEPEND > PDEPEND > OPTIONAL.
 				if not isinstance(selected_nodes, list):
 					selected_nodes = list(selected_nodes)
-				selected_nodes.sort(key=cmp_sort_key(cmp_circular_bias))
+
+				if cycle_digraph is not None:
+					selected_nodes = []
+					while cycle_digraph:
+						leaves = cycle_digraph.leaf_nodes(ignore_priority=lambda priority: not priority.buildtime)
+						if not leaves:
+							selected_nodes.extend(cycle_digraph)
+							break
+						cycle_digraph.difference_update(leaves)
+						selected_nodes.extend(leaves)
+
+				# This sort may be ineffective for > 2 nodes, since it might not account for all edges.
+				# That's why the above topological sort is needed.
+				selected_nodes.sort(key=cmp_sort_key(functools.partial(mygraph.cmp_node_priority,
+					ignore_priority=lambda priority: not priority.buildtime)))
 
 			if not selected_nodes and myblocker_uninstalls:
 				# An Uninstall task needs to be executed in order to
 				# avoid conflict if possible.
 
-				if drop_satisfied:
+				if False and drop_satisfied:
 					priority_range = DepPrioritySatisfiedRange
 				else:
 					priority_range = DepPriorityNormalRange
