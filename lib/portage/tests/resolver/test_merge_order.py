@@ -476,3 +476,84 @@ class MergeOrderTestCase(TestCase):
 				self.assertEqual(test_case.test_success, True, test_case.fail_msg)
 		finally:
 			playground.cleanup()
+
+	def testCupsGtkZeroconfCycle(self):
+
+		ebuilds = {
+			'net-dns/avahi-0.7-r2': {
+				'EAPI': '7',
+				'IUSE': '+gtk',
+				'DEPEND': 'gtk? ( x11-libs/gtk+ )',
+			},
+			'x11-libs/gtk+-2.24.32-r1': {
+				'EAPI': '7',
+				'IUSE': '+cups',
+				'DEPEND': 'cups? ( net-print/cups:= )',
+			},
+			'net-print/cups-2.2.13': {
+				'EAPI': '7',
+				'IUSE': '+zeroconf',
+				'DEPEND': 'zeroconf? ( net-dns/avahi )',
+			},
+			'app-text/ghostscript-gpl-9.50': {
+				'EAPI': '7',
+				'IUSE': '+gtk',
+				'DEPEND': 'gtk? ( x11-libs/gtk+ )',
+			},
+			'app-text/libspectre-0.2.8': {
+				'EAPI': '7',
+				'DEPEND': 'app-text/ghostscript-gpl',
+			},
+		}
+
+		installed = {
+			'net-dns/avahi-0.7-r2': {
+				'EAPI': '7',
+				'IUSE': '+gtk',
+				'USE': 'gtk+',
+				'DEPEND': 'gtk? ( x11-libs/gtk+ )',
+			},
+			'x11-libs/gtk+-2.24.8': {
+				'EAPI': '7',
+				'IUSE': '+cups',
+				'USE': 'cups',
+				'DEPEND': 'cups? ( net-print/cups:= )',
+			},
+			'net-print/cups-2.2.13': {
+				'EAPI': '7',
+				'IUSE': '+zeroconf',
+				'USE': 'zeroconf',
+				'DEPEND': 'zeroconf? ( net-dns/avahi )',
+			},
+			'app-text/ghostscript-gpl-9.26': {
+				'EAPI': '7',
+				'IUSE': '+gtk',
+				'USE': 'gtk',
+				'DEPEND': 'gtk? ( x11-libs/gtk+ )',
+			},
+			'app-text/libspectre-0.2.8': {
+				'EAPI': '7',
+				'DEPEND': 'app-text/ghostscript-gpl',
+			},
+		}
+
+		world = ['app-text/libspectre']
+
+		test_cases = (
+			ResolverPlaygroundTestCase(
+				['@world'],
+				success = True,
+				options = {'--emptytree': True},
+				#options = {'--update': True, '--deep': True},
+				#ambiguous_merge_order = True,
+				#all_permutations = True,
+				mergelist = ['app-text/ghostscript-gpl-9.50', 'app-text/libspectre-0.2.8', 'net-print/cups-2.2.13', 'x11-libs/gtk+-2.24.32-r1', 'net-dns/avahi-0.7-r2']),
+		)
+
+		playground = ResolverPlayground(ebuilds=ebuilds, installed=installed, world=world)
+		try:
+			for test_case in test_cases:
+				playground.run_TestCase(test_case)
+				self.assertEqual(test_case.test_success, True, test_case.fail_msg)
+		finally:
+			playground.cleanup()
