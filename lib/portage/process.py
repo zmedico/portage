@@ -562,6 +562,10 @@ def _exec(binary, mycommand, opt_name, fd_pipes,
 	@return: Never returns (calls os.execve)
 	"""
 
+	sandbox_enabled = binary is SANDBOX_BINARY
+	effective_uid = -1 if uid is None else uid
+	effective_gid = -1 if gid is None else gid
+
 	# If the process we're creating hasn't been given a name
 	# assign it the name of the executable.
 	if not opt_name:
@@ -703,6 +707,26 @@ def _exec(binary, mycommand, opt_name, fd_pipes,
 								writemsg("Unable to mount new /proc: %d\n" % (mount_ret,),
 									noiselevel=-1)
 								os._exit(1)
+
+							if sandbox_enabled:
+								# Create a private /var/log/sandbox since the pid namespace
+								# triggers log file name collision with a process in another
+								# pid namespace with the same pid.
+								portage_builddir = env.get('PORTAGE_BUILDDIR')
+								if portage_builddir is not None:
+									sandbox_log_dir = os.path.join(portage_builddir, 'sandbox_log')
+									global_log_dir = '/var/log/sandbox'
+									portage.util.ensure_dirs(global_log_dir)
+									portage.util.ensure_dirs(sandbox_log_dir,
+										uid=effective_uid, gid=effective_gid)
+									s = subprocess.Popen(['mount',
+										'--bind', sandbox_log_dir, global_log_dir])
+									mount_ret = s.wait()
+									if mount_ret != 0:
+										writemsg("Unable to mount %s: %d\n" % (global_log_dir, mount_ret,),
+											noiselevel=-1)
+										os._exit(1)
+
 						if unshare_net:
 							_configure_loopback_interface()
 				except AttributeError:
