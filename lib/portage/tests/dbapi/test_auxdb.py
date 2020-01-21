@@ -7,6 +7,7 @@ from portage.tests import TestCase
 from portage.tests.resolver.ResolverPlayground import ResolverPlayground
 from portage.util.futures import asyncio
 from portage.util.futures.compat_coroutine import coroutine
+from portage.util.futures.executor.fork import ForkExecutor
 
 
 class AuxdbTestCase(TestCase):
@@ -40,11 +41,18 @@ class AuxdbTestCase(TestCase):
 		portdb = playground.trees[playground.eroot]["porttree"].dbapi
 
 		loop = asyncio._wrap_loop()
-		loop.run_until_complete(self._test_mod_async(ebuilds, portdb))
+		loop.run_until_complete(self._test_mod_async(loop, ebuilds, portdb))
 
 	@coroutine
-	def _test_mod_async(self, ebuilds, portdb):
+	def _test_mod_async(self, loop, ebuilds, portdb):
 
 		for cpv, metadata in ebuilds.items():
 			eapi, = yield portdb.async_aux_get(cpv, ['EAPI'])
+			self.assertEqual(eapi, metadata['EAPI'])
+
+		yield loop.run_in_executor(ForkExecutor(loop=loop), self._test_mod_fork, ebuilds, portdb)
+
+	def _test_mod_fork(self, ebuilds, portdb):
+		for cpv, metadata in ebuilds.items():
+			eapi, = portdb.aux_get(cpv, ['EAPI'])
 			self.assertEqual(eapi, metadata['EAPI'])
