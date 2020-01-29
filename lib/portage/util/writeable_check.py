@@ -14,6 +14,7 @@ from __future__ import unicode_literals
 import io
 import logging
 import os
+import subprocess
 
 from portage import _encodings
 from portage.util import writemsg_level
@@ -112,7 +113,10 @@ def linux_ro_checker(dir_list):
 			except KeyError:
 				pass
 
-	return ro_filesystems
+	for mountpoint in ro_filesystems:
+		subprocess.call(['mount', '-o', 'remount,rw', mountpoint])
+
+	return set()
 
 
 def empty_ro_checker(dir_list):
