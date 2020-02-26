@@ -19,6 +19,7 @@ from portage.const import BASH_BINARY
 from portage.localization import _
 from portage.output import EOutput
 from portage.util import writemsg_level
+from portage.util._async.BuildLogger import BuildLogger
 from portage.util._async.PipeLogger import PipeLogger
 from portage.util.futures.compat_coroutine import coroutine
 
@@ -35,8 +36,8 @@ class SpawnProcess(SubProcess):
 		"path_lookup", "pre_exec", "close_fds", "cgroup",
 		"unshare_ipc", "unshare_mount", "unshare_pid", "unshare_net")
 
-	__slots__ = ("args",) + \
-		_spawn_kwarg_names + ("_pipe_logger", "_selinux_type",)
+	__slots__ = ("args", "log_filter_file") + \
+		_spawn_kwarg_names + ("_build_logger", "_pipe_logger", "_selinux_type",)
 
 	# Max number of attempts to kill the processes listed in cgroup.procs,
 	# given that processes may fork before they can be killed.
@@ -141,9 +142,16 @@ class SpawnProcess(SubProcess):
 						fcntl.fcntl(stdout_fd,
 						fcntl.F_GETFD) | fcntl.FD_CLOEXEC)
 
+		self._build_logger = BuildLogger(env=self.env,
+			log_path=log_file_path,
+			log_filter_file=self.log_filter_file,
+			scheduler=self.scheduler)
+
+		yield self._build_logger.async_start()
+
 		self._pipe_logger = PipeLogger(background=self.background,
 			scheduler=self.scheduler, input_fd=master_fd,
-			log_file_path=log_file_path,
+			log_file_path=self._build_logger.stdin,
 			stdout_fd=stdout_fd)
 		self._pipe_logger.addExitListener(self._pipe_logger_exit)
 		self._registered = True
@@ -173,6 +181,14 @@ class SpawnProcess(SubProcess):
 
 	def _pipe_logger_exit(self, pipe_logger):
 		self._pipe_logger = None
+		if self._build_logger is None or self._build_logger.poll() is not None:
+			self._build_logger = None
+			self._async_waitpid()
+		else:
+			self._build_logger.addExitListener(self._build_logger_exit)
+
+	def _build_logger_exit(self, build_logger):
+		self._build_logger = None
 		self._async_waitpid()
 
 	def _unregister(self):
@@ -180,6 +196,10 @@ class SpawnProcess(SubProcess):
 		if self.cgroup is not None:
 			self._cgroup_cleanup()
 			self.cgroup = None
+		if self._build_logger is not None:
+			self._build_logger.removeExitListener(self._build_logger_exit)
+			self._build_logger.cancel()
+			self._build_logger = None
 		if self._pipe_logger is not None:
 			self._pipe_logger.cancel()
 			self._pipe_logger = None
