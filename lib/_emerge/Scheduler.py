@@ -241,6 +241,7 @@ class Scheduler(PollScheduler):
 		self._completed_tasks = set()
 		self._main_exit = None
 		self._main_loadavg_handle = None
+		self._schedule_retry_handle = None
 
 		self._failed_pkgs = []
 		self._failed_pkgs_all = []
@@ -1440,6 +1441,9 @@ class Scheduler(PollScheduler):
 		if self._job_delay_timeout_id is not None:
 			self._job_delay_timeout_id.cancel()
 			self._job_delay_timeout_id = None
+		if self._schedule_retry_handle is not None:
+			self._schedule_retry_handle.cancel()
+			self._schedule_retry_handle = None
 
 	def _choose_pkg(self):
 		"""
@@ -1564,6 +1568,22 @@ class Scheduler(PollScheduler):
 
 	def _running_job_count(self):
 		return self._jobs
+
+	def _schedule(self):
+		"""
+		Call the super class _schedule implementation soon, and retry
+		until _schedule makes progress (returns True).
+		"""
+		self._event_loop.call_soon(self._schedule_retry_backoff)
+
+	def _schedule_retry_backoff(self, previous_delay=None):
+		if self._schedule_retry_handle is not None:
+			self._schedule_retry_handle.cancel()
+		self._schedule_retry_handle = None
+
+		if not PollScheduler._schedule(self):
+			delay = 1 if previous_delay is None else 2 * previous_delay
+			self._schedule_retry_handle = self._event_loop.call_later(delay, self._schedule_retry_backoff, delay)
 
 	def _schedule_tasks(self):
 
