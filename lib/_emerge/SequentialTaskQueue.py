@@ -45,7 +45,14 @@ class SequentialTaskQueue(SlotObject):
 				if not cancelled:
 					self.running_tasks.add(task)
 					future = asyncio.ensure_future(self._task_coroutine(task), loop=task.scheduler)
-					future.add_done_callback(functools.partial(self._task_exit, task))
+					future.add_done_callback(self._task_coroutine_exit)
+					# This callback will be invoked as soon as the task
+					# exits (before the future's done callback is called),
+					# and this is required in order for bool(self) to have
+					# an updated value for Scheduler._schedule make correct
+					# assumptions. Delayed updates to bool(self) is what
+					# caused Scheduler to hang as in bug 709746.
+					task.addExitListener(self._task_exit)
 		finally:
 			self._scheduling = False
 
@@ -54,17 +61,19 @@ class SequentialTaskQueue(SlotObject):
 		yield task.async_start()
 		yield task.async_wait()
 
-	def _task_exit(self, task, future):
+	def _task_coroutine_exit(self, future):
+		try:
+			future.result()
+		except asyncio.CancelledError:
+			pass
+
+	def _task_exit(self, task):
 		"""
 		Since we can always rely on exit listeners being called, the set of
  		running tasks is always pruned automatically and there is never any need
 		to actively prune it.
 		"""
 		self.running_tasks.remove(task)
-		try:
-			future.result()
-		except asyncio.CancelledError:
-			self.clear()
 		if self._task_queue:
 			self.schedule()
 
