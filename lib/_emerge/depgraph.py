@@ -53,6 +53,11 @@ from portage.util._eventloop.EventLoop import EventLoop
 from portage.util._eventloop.global_event_loop import global_event_loop
 from portage.versions import _pkg_str, catpkgsplit
 
+try:
+	from portage.xml.metadata import MetaDataXML
+except Exception:
+	MetaDataXML = None
+
 from _emerge.AtomArg import AtomArg
 from _emerge.Blocker import Blocker
 from _emerge.BlockerCache import BlockerCache
@@ -9162,6 +9167,49 @@ class depgraph(object):
 			show_masked_packages(masked_packages)
 			show_mask_docs()
 			writemsg("\n", noiselevel=-1)
+
+		# Build a list of problematic packages
+		maintainer_nag_packages = []
+
+		for pkg in self._dynamic_config.digraph:
+			if not isinstance(pkg, Package):
+				continue
+
+			if not pkg.type_name == 'ebuild':
+				continue
+
+			maintainer_nag = pkg.root_config.settings.repositories[pkg.repo].maintainer_nag
+			maintainer_nag_url = pkg.root_config.settings.repositories[pkg.repo].maintainer_nag_url
+
+			if not maintainer_nag:
+				continue
+
+			path = os.path.dirname(pkg.root_config.trees['porttree'].dbapi.findname(pkg.cpv, myrepo=pkg.repo))
+			path = os.path.join(path, 'metadata.xml')
+
+			if MetaDataXML is not None and os.path.isfile(path):
+				try:
+					metadata_xml = MetaDataXML(path, None)
+					maintainer = metadata_xml.format_maintainer_string()
+				except SyntaxError:
+					continue
+
+				if not maintainer:
+					maintainer_nag_packages.append(pkg.cpv + "::" + pkg.repo)
+
+		if maintainer_nag_packages:
+			writemsg("\n" + colorize("WARN", "!!!") + \
+				 " The following packages have no maintainer. They are at greater risk of bugs." +
+				 "\n!!! You can help to keep it in tree and fix bugs (inc. possible security issues)")
+
+			if maintainer_nag_url:
+				writemsg("\n!!! Please see: " + maintainer_nag_url)
+
+			writemsg("\n")
+			for pkg in maintainer_nag_packages:
+				writemsg("- " + pkg)
+			writemsg("\n")
+
 
 		for pargs, kwargs in self._dynamic_config._unsatisfied_deps_for_display:
 			self._show_unsatisfied_dep(*pargs, **kwargs)
