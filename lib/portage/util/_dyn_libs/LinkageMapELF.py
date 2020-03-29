@@ -25,6 +25,7 @@ from portage.util import normalize_path
 from portage.util import varexpand
 from portage.util import writemsg_level
 from portage.util._dyn_libs.NeededEntry import NeededEntry
+from portage.util.elf.constants import ET_DYN
 from portage.util.elf.header import ELFHeader
 
 if sys.hexversion >= 0x3000000:
@@ -313,6 +314,8 @@ class LinkageMapELF(object):
 						continue
 					entry.multilib_category = compute_multilib_category(elf_header)
 					entry.filename = entry.filename[root_len:]
+					if not entry.soname and elf_header.e_type == ET_DYN:
+						entry.soname = os.path.basename(entry.filename)
 					owner = plibs.pop(entry.filename, None)
 					lines.append((owner, "scanelf", _unicode(entry)))
 				proc.wait()

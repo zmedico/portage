@@ -35,6 +35,7 @@ portage.proxy.lazyimport.lazyimport(globals(),
 	'portage.package.ebuild._ipc.QueryCommand:QueryCommand',
 	'portage.dep._slot_operator:evaluate_slot_operator_equal_deps',
 	'portage.package.ebuild._spawn_nofetch:spawn_nofetch',
+	'portage.util.elf.constants:ET_DYN',
 	'portage.util.elf.header:ELFHeader',
 	'portage.dep.soname.multilib_category:compute_multilib_category',
 	'portage.util._desktop_entry:validate_desktop_entry',
@@ -2399,6 +2400,8 @@ def _post_src_install_soname_symlinks(mysettings, out):
 
 		# Compute the multilib category and write it back to the file.
 		entry.multilib_category = compute_multilib_category(elf_header)
+		if not entry.soname and elf_header.e_type == ET_DYN:
+			entry.soname = os.path.basename(entry.filename)
 		needed_file.write(_unicode(entry))
 
 		if entry.multilib_category is None:
