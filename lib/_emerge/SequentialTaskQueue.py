@@ -51,14 +51,19 @@ class SequentialTaskQueue(SlotObject):
 					# an updated value for Scheduler._schedule to base
 					# assumptions upon. Delayed updates to bool(self) is
 					# what caused Scheduler to hang as in bug 709746.
-					task.addExitListener(self._task_exit)
+					#task.addExitListener(self._task_exit)
 		finally:
 			self._scheduling = False
 
 	@coroutine
 	def _task_coroutine(self, task):
-		yield task.async_start()
-		yield task.async_wait()
+		try:
+			yield task.async_start()
+			yield task.async_wait()
+		except asyncio.CancelledError:
+			self._task_exit(task)
+			raise
+		self._task_exit(task)
 
 	def _task_exit(self, task):
 		"""
