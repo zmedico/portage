@@ -1,0 +1,25 @@
+#!/usr/bin/python -b
+# Copyright 2020 Gentoo Authors
+# Distributed under the terms of the GNU General Public License v2
+
+import signal
+import sys
+
+import portage
+portage._internal_caller = True
+portage._disable_legacy_globals()
+from portage._edistfetch.main import edistfetch_main
+from portage.util._eventloop.global_event_loop import global_event_loop
+
+if __name__ == "__main__":
+
+	def debug_signal(_signum, _frame):
+		import pdb
+		pdb.set_trace()
+
+	signal.signal(signal.SIGUSR1, debug_signal)
+
+	try:
+		sys.exit(edistfetch_main(sys.argv[1:]))
+	finally:
+		global_event_loop().close()
