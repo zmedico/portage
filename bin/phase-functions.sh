@@ -146,6 +146,7 @@ __filter_readonly_variables() {
 		fi
 	fi
 
+	___eapi_vars_unexport
 	"${PORTAGE_PYTHON:-/usr/bin/python}" "${PORTAGE_BIN_PATH}"/filter-bash-environment.py "${filtered_vars}" || die "filter-bash-environment.py failed"
 }
 
@@ -212,6 +213,7 @@ __ebuild_phase() {
 
 __ebuild_phase_with_hooks() {
 	local x phase_name=${1}
+	___eapi_vars_export
 	for x in {pre_,,post_}${phase_name} ; do
 		__ebuild_phase ${x}
 	done
@@ -223,6 +225,7 @@ __dyn_pretend() {
 		__vecho ">>> Remove '$PORTAGE_BUILDDIR/.pretended' to force pretend."
 		return 0
 	fi
+	___eapi_vars_export
 	__ebuild_phase pre_pkg_pretend
 	__ebuild_phase pkg_pretend
 	>> "$PORTAGE_BUILDDIR/.pretended" || \
@@ -236,6 +239,7 @@ __dyn_setup() {
 		__vecho ">>> Remove '$PORTAGE_BUILDDIR/.setuped' to force setup."
 		return 0
 	fi
+	___eapi_vars_export
 	__ebuild_phase pre_pkg_setup
 	__ebuild_phase pkg_setup
 	>> "$PORTAGE_BUILDDIR/.setuped" || \
@@ -252,6 +256,7 @@ __dyn_unpack() {
 		install -m${PORTAGE_WORKDIR_MODE:-0700} -d "${WORKDIR}" || die "Failed to create dir '${WORKDIR}'"
 	fi
 	cd "${WORKDIR}" || die "Directory change failed: \`cd '${WORKDIR}'\`"
+	___eapi_vars_export
 	__ebuild_phase pre_src_unpack
 	__vecho ">>> Unpacking source..."
 	__ebuild_phase src_unpack
@@ -386,6 +391,7 @@ __dyn_prepare() {
 
 	trap __abort_prepare SIGINT SIGQUIT
 
+	___eapi_vars_export
 	__ebuild_phase pre_src_prepare
 	__vecho ">>> Preparing source in $PWD ..."
 	__ebuild_phase src_prepare
@@ -423,6 +429,7 @@ __dyn_configure() {
 
 	trap __abort_configure SIGINT SIGQUIT
 
+	___eapi_vars_export
 	__ebuild_phase pre_src_configure
 
 	__vecho ">>> Configuring source in $PWD ..."
@@ -456,6 +463,7 @@ __dyn_compile() {
 
 	trap __abort_compile SIGINT SIGQUIT
 
+	___eapi_vars_export
 	__ebuild_phase pre_src_compile
 
 	__vecho ">>> Compiling source in $PWD ..."
@@ -500,6 +508,7 @@ __dyn_test() {
 	else
 		local save_sp=${SANDBOX_PREDICT}
 		addpredict /
+		___eapi_vars_export
 		__ebuild_phase pre_src_test
 
 		__vecho ">>> Test phase: ${CATEGORY}/${PF}"
@@ -553,6 +562,7 @@ __dyn_install() {
 	eval "[[ -n \$QA_PRESTRIPPED_${ARCH/-/_} ]] && \
 		export QA_PRESTRIPPED_${ARCH/-/_}"
 
+	___eapi_vars_export
 	__ebuild_phase pre_src_install
 
 	if ___eapi_has_prefix_variables; then
@@ -695,6 +705,7 @@ __dyn_install() {
 		--filter-path --filter-sandbox --allow-extra-vars > \
 		"${PORTAGE_BUILDDIR}"/build-info/environment
 	assert "__save_ebuild_env failed"
+	___eapi_vars_unexport
 	cd "${PORTAGE_BUILDDIR}"/build-info || die
 
 	${PORTAGE_BZIP2_COMMAND} -f9 environment
@@ -1087,11 +1098,13 @@ __ebuild_main() {
 		__save_ebuild_env | __filter_readonly_variables \
 			--filter-features > "$T/environment"
 		assert "__save_ebuild_env failed"
+		___eapi_vars_unexport
 		chgrp "${PORTAGE_GRPNAME:-portage}" "$T/environment"
 		chmod g+w "$T/environment"
 	fi
 	[[ -n $PORTAGE_EBUILD_EXIT_FILE ]] && > "$PORTAGE_EBUILD_EXIT_FILE"
 	if [[ -n $PORTAGE_IPC_DAEMON ]] ; then
+		___eapi_vars_unexport
 		[[ ! -s $SANDBOX_LOG ]]
 		"$PORTAGE_BIN_PATH"/ebuild-ipc exit $?
 	fi

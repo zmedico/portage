@@ -10,6 +10,7 @@ __all__ = [
 import copy
 from itertools import chain
 import grp
+import io
 import logging
 import platform
 import pwd
@@ -29,7 +30,7 @@ portage.proxy.lazyimport.lazyimport(globals(),
 	'portage.util.locale:check_locale,split_LC_ALL',
 )
 from portage import bsd_chflags, \
-	load_mod, os, selinux, _unicode_decode
+	load_mod, os, selinux, _encodings, _unicode_decode
 from portage.const import CACHE_PATH, \
 	DEPCACHE_PATH, INCREMENTALS, MAKE_CONF_FILE, \
 	MODULES_FILE_PATH, PORTAGE_BASE_PATH, \
@@ -2755,14 +2756,36 @@ class config(object):
 		eapi_attrs = _get_eapi_attrs(eapi)
 		phase = self.get('EBUILD_PHASE')
 		emerge_from = self.get('EMERGE_FROM')
+		temp_dir = None
 		filter_calling_env = False
 		if self.mycpv is not None and \
-			not (emerge_from == 'ebuild' and phase == 'setup') and \
+			'PORTAGE_BUILDDIR_LOCKED' in self and \
 			phase not in ('clean', 'cleanrm', 'depend', 'fetch'):
-			temp_dir = self.get('T')
-			if temp_dir is not None and \
-				os.path.exists(os.path.join(temp_dir, 'environment')):
-				filter_calling_env = True
+			temp_dir = self['T']
+			# These variables will exported by ebuild.sh if appropriate
+			# for the current EAPI, but export is delayed since large
+			# values may trigger E2BIG errors during attempts to spawn
+			# subprocesses.
+			unexported = []
+			for key in special_env_vars.environ_unexported:
+				# Don't export AA for EAPIs that forbid it.
+				if key == 'AA' and not eapi_exports_AA(eapi):
+					continue
+				value = self.get(key)
+				if value is not None:
+					unexported.append((key, value))
+
+			# Write this file even if it's empty, so that ebuild.sh can
+			# rely on its existence.
+			with io.open(os.path.join(temp_dir, 'environment.unexported'),
+				mode='wt', encoding=_encodings['repo.content']) as f:
+				for key, value in unexported:
+					f.write('%s="%s"\n' % (key, value.replace('"', '\\"')))
+
+		if temp_dir is not None and \
+			not (emerge_from == 'ebuild' and phase == 'setup') and \
+			os.path.exists(os.path.join(temp_dir, 'environment')):
+			filter_calling_env = True
 
 		environ_whitelist = self._environ_whitelist
 		for x, myvalue in self.iteritems():
@@ -2804,10 +2827,6 @@ class config(object):
 
 		# Filtered by IUSE and implicit IUSE.
 		mydict["USE"] = self.get("PORTAGE_USE", "")
-
-		# Don't export AA to the ebuild environment in EAPIs that forbid it
-		if not eapi_exports_AA(eapi):
-			mydict.pop("AA", None)
 
 		if not eapi_exports_merge_type(eapi):
 			mydict.pop("MERGE_TYPE", None)
