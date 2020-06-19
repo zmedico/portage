@@ -293,6 +293,13 @@ call_has_and_best_version() {
 			port=binhost_server.server_port,
 			path=binhost_remote_path)
 
+		binpkg_format = settings.get("BINPKG_FORMAT", "xpak")
+		self.assertIn(binpkg_format, ("xpak", "gpkg"))
+		if binpkg_format == "xpak":
+			foo_filename = "foo-0.tbz2"
+		elif binpkg_format == "gpkg":
+			foo_filename = "foo-0.gpkg.tar"
+
 		test_commands = (
 			emerge_cmd + ("--usepkgonly", "--root", cross_root, "--quickpkg-direct=y", "dev-libs/A"),
 			env_update_cmd,
@@ -325,11 +332,11 @@ call_has_and_best_version() {
 			rm_cmd + ("-rf", cachedir),
 			emerge_cmd + ("--oneshot", "virtual/foo"),
 			lambda: self.assertFalse(os.path.exists(
-				os.path.join(pkgdir, "virtual", "foo-0.tbz2"))),
+				os.path.join(pkgdir, "virtual", foo_filename))),
 			({"FEATURES" : "unmerge-backup"},) + \
 				emerge_cmd + ("--unmerge", "virtual/foo"),
 			lambda: self.assertTrue(os.path.exists(
-				os.path.join(pkgdir, "virtual", "foo-0.tbz2"))),
+				os.path.join(pkgdir, "virtual", foo_filename))),
 			emerge_cmd + ("--pretend", "dev-libs/A"),
 			ebuild_cmd + (test_ebuild, "manifest", "clean", "package", "merge"),
 			emerge_cmd + ("--pretend", "--tree", "--complete-graph", "dev-libs/A"),
