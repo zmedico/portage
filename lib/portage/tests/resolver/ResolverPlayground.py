@@ -19,6 +19,7 @@ from portage._sets.base import InternalPackageSet
 from portage.tests import cnf_path
 from portage.util import ensure_dirs, normalize_path
 from portage.versions import catsplit
+from portage.exception import InvalidBinaryPackageFormat
 
 import _emerge
 from _emerge.actions import _calc_depclean
@@ -155,13 +156,13 @@ class ResolverPlayground:
 
 		self._create_distfiles(distfiles)
 		self._create_ebuilds(ebuilds)
-		self._create_binpkgs(binpkgs)
 		self._create_installed(installed)
 		self._create_profile(ebuilds, eclasses, installed, profile, repo_configs, user_config, sets)
 		self._create_world(world, world_sets)
 
 		self.settings, self.trees = self._load_config()
 
+		self._create_binpkgs(binpkgs)
 		self._create_ebuild_manifests(ebuilds)
 
 		portage.util.noiselimit = 0
@@ -268,6 +269,7 @@ class ResolverPlayground:
 		# a dict.
 		items = getattr(binpkgs, 'items', None)
 		items = items() if items is not None else binpkgs
+		binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 		for cpv, metadata in items:
 			a = Atom("=" + cpv, allow_repo=True)
 			repo = a.repo
@@ -287,14 +289,31 @@ class ResolverPlayground:
 			repo_dir = self.pkgdir
 			category_dir = os.path.join(repo_dir, cat)
 			if "BUILD_ID" in metadata:
-				binpkg_path = os.path.join(category_dir, pn,
-					"%s-%s.xpak"% (pf, metadata["BUILD_ID"]))
+				if binpkg_format == "xpak":
+					binpkg_path = os.path.join(category_dir, pn,
+						"%s-%s.xpak"% (pf, metadata["BUILD_ID"]))
+				elif binpkg_format == "gpkg":
+					binpkg_path = os.path.join(category_dir, pn,
+						"%s-%s.gpkg.tar"% (pf, metadata["BUILD_ID"]))
+				else:
+					raise InvalidBinaryPackageFormat(binpkg_format)
 			else:
-				binpkg_path = os.path.join(category_dir, pf + ".tbz2")
+				if binpkg_format == "xpak":
+					binpkg_path = os.path.join(category_dir, pf + ".tbz2")
+				elif binpkg_format == "gpkg":
+					binpkg_path = os.path.join(category_dir, pf + ".gpkg.tar")
+				else:
+					raise InvalidBinaryPackageFormat(binpkg_format)
 
 			ensure_dirs(os.path.dirname(binpkg_path))
-			t = portage.xpak.tbz2(binpkg_path)
-			t.recompose_mem(portage.xpak.xpak_mem(metadata))
+			if binpkg_format == "xpak":
+				t = portage.xpak.tbz2(binpkg_path)
+				t.recompose_mem(portage.xpak.xpak_mem(metadata))
+			elif binpkg_format == "gpkg":
+				t = portage.gpkg.gpkg(self.settings, cpv, binpkg_path)
+				t.compress(os.path.dirname(binpkg_path), metadata)
+			else:
+				raise InvalidBinaryPackageFormat(binpkg_format)
 
 	def _create_installed(self, installed):
 		for cpv in installed:
