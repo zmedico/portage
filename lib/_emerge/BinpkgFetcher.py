@@ -14,6 +14,7 @@ import stat
 import sys
 import portage
 from portage import os
+from portage.exception import InvalidBinaryPackageFormat
 from portage.util._async.AsyncTaskFuture import AsyncTaskFuture
 from portage.util._pty import _create_pty_or_pipe
 
@@ -90,6 +91,9 @@ class _BinpkgFetcherProcess(SpawnProcess):
 		bintree = pkg.root_config.trees["bintree"]
 		settings = bintree.settings
 		pkg_path = self.pkg_path
+		binpkg_format = settings.get("BINPKG_FORMAT", "xpak")
+		if binpkg_format not in ("xpak", "gpkg"):
+			raise InvalidBinaryPackageFormat(binpkg_format)
 
 		exists = os.path.exists(pkg_path)
 		resume = exists and os.path.basename(pkg_path) in bintree.invalids
@@ -106,13 +110,20 @@ class _BinpkgFetcherProcess(SpawnProcess):
 			instance_key = bintree.dbapi._instance_key(pkg.cpv)
 			rel_uri = bintree._remotepkgs[instance_key].get("PATH")
 			if not rel_uri:
-				rel_uri = pkg.cpv + ".tbz2"
+				if binpkg_format == "xpak":
+					rel_uri = pkg.cpv + ".tbz2"
+				elif binpkg_format == "gpkg":
+					rel_uri = pkg.cpv + ".gpkg.tar"
 			remote_base_uri = bintree._remotepkgs[
 				instance_key]["BASE_URI"]
 			uri = remote_base_uri.rstrip("/") + "/" + rel_uri.lstrip("/")
 		else:
-			uri = settings["PORTAGE_BINHOST"].rstrip("/") + \
-				"/" + pkg.pf + ".tbz2"
+			if binpkg_format == "xpak":
+				uri = settings["PORTAGE_BINHOST"].rstrip("/") + \
+					"/" + pkg.pf + ".tbz2"
+			elif binpkg_format == "gpkg":
+				uri = settings["PORTAGE_BINHOST"].rstrip("/") + \
+					"/" + pkg.pf + ".gpkg.tar"
 
 		if pretend:
 			portage.writemsg_stdout("\n%s\n" % uri, noiselevel=-1)

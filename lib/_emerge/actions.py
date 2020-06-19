@@ -41,7 +41,8 @@ from portage import shutil
 from portage import eapi_is_supported, _encodings, _unicode_decode
 from portage.cache.cache_errors import CacheError
 from portage.const import GLOBAL_CONFIG_PATH, VCS_DIRS, _DEPCLEAN_LIB_CHECK_DEFAULT
-from portage.const import SUPPORTED_BINPKG_FORMATS, TIMESTAMP_FORMAT
+from portage.const import SUPPORTED_BINPKG_FORMATS, SUPPORTED_XPAK_EXTENSIONS, \
+	SUPPORTED_GPKG_EXTENSIONS, TIMESTAMP_FORMAT
 from portage.dbapi.dep_expand import dep_expand
 from portage.dbapi._expand_new_virt import expand_new_virt
 from portage.dbapi.IndexedPortdb import IndexedPortdb
@@ -1999,9 +2000,16 @@ def action_info(settings, trees, myopts, myfiles):
 			elif pkg_type == "ebuild":
 				ebuildpath = portdb.findname(pkg.cpv, myrepo=pkg.repo)
 			elif pkg_type == "binary":
-				tbz2_file = bindb.bintree.getname(pkg.cpv)
+				binpkg_file = bindb.bintree.getname(pkg.cpv)
 				ebuild_file_name = pkg.cpv.split("/")[1] + ".ebuild"
-				ebuild_file_contents = portage.xpak.tbz2(tbz2_file).getfile(ebuild_file_name)
+				if binpkg_file.endswith(SUPPORTED_XPAK_EXTENSIONS):
+					ebuild_file_contents = portage.xpak.tbz2(binpkg_file)\
+						.getfile(ebuild_file_name)
+				elif binpkg_file.endswith(SUPPORTED_GPKG_EXTENSIONS):
+					ebuild_file_contents = portage.gpkg.gpkg(settings, 
+						pkg.cpv, binpkg_file).get_metadata(ebuild_file_name)
+				else:
+					continue
 				tmpdir = tempfile.mkdtemp()
 				ebuildpath = os.path.join(tmpdir, ebuild_file_name)
 				file = open(ebuildpath, 'w')

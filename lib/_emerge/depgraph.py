@@ -18,7 +18,8 @@ from itertools import chain
 import portage
 from portage import os
 from portage import _unicode_decode, _unicode_encode, _encodings
-from portage.const import PORTAGE_PACKAGE_ATOM, USER_CONFIG_PATH, VCS_DIRS
+from portage.const import PORTAGE_PACKAGE_ATOM, USER_CONFIG_PATH, VCS_DIRS, \
+	SUPPORTED_GPKG_EXTENSIONS
 from portage.dbapi import dbapi
 from portage.dbapi.dep_expand import dep_expand
 from portage.dbapi.DummyTree import DummyTree
@@ -4034,8 +4035,7 @@ class depgraph(object):
 		onlydeps = "--onlydeps" in self._frozen_config.myopts
 		lookup_owners = []
 		for x in myfiles:
-			ext = os.path.splitext(x)[1]
-			if ext==".tbz2":
+			if x.endswith(".tbz2") or x.endswith(SUPPORTED_GPKG_EXTENSIONS):
 				if not os.path.exists(x):
 					if os.path.exists(
 						os.path.join(pkgsettings["PKGDIR"], "All", x)):
@@ -4045,11 +4045,16 @@ class depgraph(object):
 						x = os.path.join(pkgsettings["PKGDIR"], x)
 					else:
 						writemsg("\n\n!!! Binary package '"+str(x)+"' does not exist.\n", noiselevel=-1)
-						writemsg("!!! Please ensure the tbz2 exists as specified.\n\n", noiselevel=-1)
+						writemsg("!!! Please ensure the binpkg exists as specified.\n\n", noiselevel=-1)
 						return 0, myfavorites
-				mytbz2=portage.xpak.tbz2(x)
-				mykey = None
-				cat = mytbz2.getfile("CATEGORY")
+				if x.endswith(".tbz2"):
+					mytbz2=portage.xpak.tbz2(x)
+					mykey = None
+					cat = mytbz2.getfile("CATEGORY")
+				elif x.endswith(SUPPORTED_GPKG_EXTENSIONS):
+					mygpkg = portage.gpkg.gpkg(self.frozen_config, None, x)
+					mykey = None
+					cat = mygpkg.get_metadata("CATEGORY")
 				if cat is not None:
 					cat = _unicode_decode(cat.strip(),
 						encoding=_encodings['repo.content'])
@@ -4073,7 +4078,7 @@ class depgraph(object):
 
 				args.append(PackageArg(arg=x, package=pkg,
 					root_config=root_config))
-			elif ext==".ebuild":
+			elif x.endswith(".ebuild"):
 				ebuild_path = portage.util.normalize_path(os.path.abspath(x))
 				pkgdir = os.path.dirname(ebuild_path)
 				tree_root = os.path.dirname(os.path.dirname(pkgdir))
