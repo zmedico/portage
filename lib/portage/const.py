@@ -248,6 +248,7 @@ LIVE_ECLASSES = frozenset([
 
 SUPPORTED_BINPKG_FORMATS = ("tar", "rpm")
 SUPPORTED_XPAK_EXTENSIONS = (".tbz2", ".xpak")
+SUPPORTED_GPKG_EXTENSIONS = (".gpkg.tar", )
 
 # Time formats used in various places like metadata.chk.
 TIMESTAMP_FORMAT = "%a, %d %b %Y %H:%M:%S +0000"	# to be used with time.gmtime()

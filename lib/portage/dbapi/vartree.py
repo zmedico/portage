@@ -45,6 +45,7 @@ portage.proxy.lazyimport.lazyimport(globals(),
 	'portage.util._eventloop.global_event_loop:global_event_loop',
 	'portage.versions:best,catpkgsplit,catsplit,cpv_getkey,vercmp,' + \
 		'_get_slot_re,_pkgsplit@pkgsplit,_pkg_str,_unknown_repo',
+	'portage.gpkg',
 	'subprocess',
 	'tarfile',
 )
@@ -54,7 +55,8 @@ from portage.const import CACHE_PATH, CONFIG_MEMORY_FILE, \
 from portage.dbapi import dbapi
 from portage.exception import CommandNotFound, \
 	InvalidData, InvalidLocation, InvalidPackageName, \
-	FileNotFound, PermissionDenied, UnsupportedAPIException
+	InvalidBinaryPackageFormat, FileNotFound, PermissionDenied, \
+	UnsupportedAPIException
 from portage.localization import _
 from portage.util.futures import asyncio
 
@@ -1007,22 +1009,34 @@ class vardbapi(dbapi):
 		if include_unmodified_config is not None:
 			opts_list.append('--include-unmodified-config={}'.format(
 				'y' if include_unmodified_config else 'n'))
-
 		opts, args = parser.parse_known_args(opts_list)
 
-		tar_cmd = ('tar', '-x', '--xattrs', '--xattrs-include=*', '-C', dest_dir)
-		pr, pw = os.pipe()
-		proc = (yield asyncio.create_subprocess_exec(*tar_cmd, stdin=pr))
-		os.close(pr)
-		with os.fdopen(pw, 'wb', 0) as pw_file:
+		binpkg_format = settings.get("BINPKG_FORMAT", "xpak")
+		if binpkg_format == "xpak":
+			tar_cmd = ('tar', '-x', '--xattrs', '--xattrs-include=*', '-C', dest_dir)
+			pr, pw = os.pipe()
+			proc = (yield asyncio.create_subprocess_exec(*tar_cmd, stdin=pr))
+			os.close(pr)
+			with os.fdopen(pw, 'wb', 0) as pw_file:
+				excluded_config_files = (yield loop.run_in_executor(ForkExecutor(loop=loop),
+					functools.partial(self._dblink(cpv).quickpkg,
+					pw_file,
+					include_config=opts.include_config == 'y',
+					include_unmodified_config=opts.include_unmodified_config == 'y')))
+			yield proc.wait()
+			if proc.returncode != os.EX_OK:
+				raise PortageException('command failed: {}'.format(tar_cmd))
+		elif binpkg_format == "gpkg":
+			_, gpkg_tmp = tempfile.mkstemp(suffix=".gpkg.tar")
 			excluded_config_files = (yield loop.run_in_executor(ForkExecutor(loop=loop),
 				functools.partial(self._dblink(cpv).quickpkg,
-				pw_file,
+				gpkg_tmp,
 				include_config=opts.include_config == 'y',
 				include_unmodified_config=opts.include_unmodified_config == 'y')))
-		yield proc.wait()
-		if proc.returncode != os.EX_OK:
-			raise PortageException('command failed: {}'.format(tar_cmd))
+			portage.gpkg.gpkg(settings, cpv, gpkg_tmp).decompress(dest_dir)
+			os.remove(gpkg_tmp)
+		else:
+			raise InvalidBinaryPackageFormat(binpkg_format)
 
 		if excluded_config_files:
 			log_lines = ([_("Config files excluded by QUICKPKG_DEFAULT_OPTS (see quickpkg(1) man page):")] +
@@ -1961,7 +1975,8 @@ class dblink:
 		self.contentscache = pkgfiles
 		return pkgfiles
 
-	def quickpkg(self, output_file, include_config=False, include_unmodified_config=False):
+	def quickpkg(self, output_file, metadata=None, 
+		include_config=False, include_unmodified_config=False):
 		"""
 		Create a tar file appropriate for use by quickpkg.
 
@@ -1983,6 +1998,7 @@ class dblink:
 		contents = self.getcontents()
 		excluded_config_files = []
 		protect = None
+		binpkg_format = settings.get("BINPKG_FORMAT", "xpak")
 
 		if not include_config:
 			confprot = ConfigProtect(settings['EROOT'],
@@ -2003,11 +2019,20 @@ class dblink:
 				excluded_config_files.append(filename)
 				return True
 
-		# The tarfile module will write pax headers holding the
-		# xattrs only if PAX_FORMAT is specified here.
-		with tarfile.open(fileobj=output_file, mode='w|',
-			format=tarfile.PAX_FORMAT if xattrs else tarfile.DEFAULT_FORMAT) as tar:
-			tar_contents(contents, settings['ROOT'], tar, protect=protect, xattrs=xattrs)
+		if binpkg_format == "xpak":
+			# The tarfile module will write pax headers holding the
+			# xattrs only if PAX_FORMAT is specified here.
+			with tarfile.open(fileobj=output_file, mode='w|',
+				format=tarfile.PAX_FORMAT if xattrs else tarfile.DEFAULT_FORMAT
+				) as tar:
+				tar_contents(contents, settings['ROOT'], tar,
+					protect=protect, xattrs=xattrs)
+		elif binpkg_format == "gpkg":
+			gpkg_file = portage.gpkg.gpkg(settings, cpv, output_file)
+			gpkg_file._quickpkg(contents, metadata, settings['ROOT'],
+				protect=protect)
+		else:
+			raise InvalidBinaryPackageFormat(binpkg_format)
 
 		return excluded_config_files
 
