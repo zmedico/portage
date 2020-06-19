@@ -1,5 +1,5 @@
 #!/usr/bin/python -b
-# Copyright 2009-2014 Gentoo Foundation
+# Copyright 2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 import argparse
@@ -17,7 +17,6 @@ def command_compose(args):
 		sys.stderr.write("4 arguments are required, got %s\n" % len(args))
 		return 1
 
-	print(args)
 	cpv, binpkg_path, metadata_dir, image_dir = args
 
 	if not os.path.isdir(metadata_dir):
