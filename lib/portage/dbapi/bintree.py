@@ -745,6 +745,7 @@ class binarytree(object):
 				pkgindex = self._new_pkgindex()
 			metadata = {}
 			basename_index = {}
+			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 			for d in pkgindex.packages:
 				cpv = _pkg_str(d["CPV"], metadata=d,
 					settings=self.settings, db=self.dbapi)
@@ -752,7 +753,12 @@ class binarytree(object):
 				metadata[_instance_key(cpv)] = d
 				path = d.get("PATH")
 				if not path:
-					path = cpv + ".tbz2"
+					if binpkg_format == "xpak":
+						path = cpv + ".tbz2"
+					elif binpkg_format == "gpkg":
+						path = cpv + ".gpkg.tar"
+					else:
+						continue
 
 				if reindex:
 					basename = os.path.basename(path)
@@ -814,8 +820,8 @@ class binarytree(object):
 								update_pkgindex = True
 							# Omit PATH if it is the default path for
 							# the current Packages format version.
-							if (mypath != mycpv + ".tbz2") and \
-								(mypath != mycpv + ".gpkg.tar"):
+							if ((mypath != mycpv + ".tbz2") 
+								and (mypath != mycpv + ".gpkg.tar")):
 								d["PATH"] = mypath
 								if not oldpath:
 									update_pkgindex = True
@@ -837,10 +843,11 @@ class binarytree(object):
 					mycat = pkg_metadata.get("CATEGORY", "")
 					mypf = pkg_metadata.get("PF", "")
 					slot = pkg_metadata.get("SLOT", "")
-					if myfile.endswith(SUPPORTED_XPAK_EXTENSIONS):
-						mypkg = myfile[:-5]
-					elif myfile.endswith(SUPPORTED_GPKG_EXTENSIONS):
-						mypkg = myfile[:-9]
+					for ext in (SUPPORTED_XPAK_EXTENSIONS 
+						+ SUPPORTED_GPKG_EXTENSIONS):
+						if myfile.endswith(ext):
+							mypkg = myfile[:-len(ext)]
+							break
 					if not mycat or not mypf or not slot:
 						#old-style or corrupt package
 						writemsg(_("\n!!! Invalid binary package: '%s'\n") % full_path,
@@ -1501,6 +1508,7 @@ class binarytree(object):
 		"""
 
 		pkg_path = self.getname(cpv)
+		binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 
 		d = dict(cpv._metadata.items())
 		d.update(perform_multiple_checksums(
@@ -1513,8 +1521,14 @@ class binarytree(object):
 
 		rel_path = pkg_path[len(self.pkgdir)+1:]
 		# record location if it's non-default
-		if rel_path != cpv + ".tbz2":
-			d["PATH"] = rel_path
+		if binpkg_format == "xpak":
+			if rel_path != cpv + ".tbz2":
+				d["PATH"] = rel_path
+		elif binpkg_format == "gpkg":
+			if rel_path != cpv + ".gpkg.tar":
+				d["PATH"] = rel_path
+		else:
+			raise InvalidBinaryPackageFormat(binpkg_format)
 
 		return d
 
