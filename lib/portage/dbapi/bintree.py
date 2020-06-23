@@ -1689,7 +1689,7 @@ class binarytree(object):
 			return ""
 		return mymatch
 
-	def getname(self, cpv, allocate_new=None):
+	def getname(self, cpv, allocate_new=None, binpkg_format=None):
 		"""Returns a file location for this package.
 		If cpv has both build_time and build_id attributes, then the
 		path to the specific corresponding instance is returned.
@@ -1704,6 +1704,9 @@ class binarytree(object):
 			cpv.cp
 		except AttributeError:
 			cpv = _pkg_str(cpv)
+
+		if binpkg_format is None:
+			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 
 		filename = None
 		if allocate_new:
@@ -1728,7 +1731,6 @@ class binarytree(object):
 					return None
 
 		if filename is None:
-			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 			if binpkg_format == "xpak":
 				if self._multi_instance:
 					pf = catsplit(cpv)[1]
