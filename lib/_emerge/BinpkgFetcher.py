@@ -11,6 +11,8 @@ import stat
 import sys
 import portage
 from portage import os
+from portage.const import (SUPPORTED_XPAK_EXTENSIONS,
+	SUPPORTED_GPKG_EXTENSIONS)
 from portage.exception import InvalidBinaryPackageFormat
 from portage.util._async.AsyncTaskFuture import AsyncTaskFuture
 from portage.util._pty import _create_pty_or_pipe
@@ -18,16 +20,37 @@ from portage.util._pty import _create_pty_or_pipe
 
 class BinpkgFetcher(CompositeTask):
 
-	__slots__ = ("pkg", "pretend", "logfile", "pkg_path")
+	__slots__ = ("pkg", "pretend", "logfile", "pkg_path",
+		"binpkg_format", "binpkg_format_pending", "retry")
 
 	def __init__(self, **kwargs):
 		CompositeTask.__init__(self, **kwargs)
+		self.binpkg_format_pending = ["xpak", "gpkg"]
+		self.retry = True
+
 		pkg = self.pkg
-		self.pkg_path = pkg.root_config.trees["bintree"].getname(
-			pkg.cpv) + ".partial"
+		bintree = pkg.root_config.trees["bintree"]
+		settings = bintree.settings
+		self.binpkg_format = settings.get("BINPKG_FORMAT", "xpak")
+		binpkg_path = None
+
+		if bintree._remote_has_index:
+			instance_key = bintree.dbapi._instance_key(pkg.cpv)
+			binpkg_path = bintree._remotepkgs[instance_key].get("PATH")
+			if binpkg_path:
+				# use binhost index format, and do not try other formats
+				self.pkg_path = os.path.basename(binpkg_path) + ".partial"
+				self.retry = False
+
+		if not binpkg_path:
+			# try use local default format
+			self.pkg_path = pkg.root_config.trees["bintree"].getname(
+				pkg.cpv, binpkg_format=self.binpkg_format) + ".partial"
+			self.binpkg_format_pending.remove(self.binpkg_format)
 
 	def _start(self):
 		fetcher = _BinpkgFetcherProcess(background=self.background,
+			binpkg_format=self.binpkg_format,
 			logfile=self.logfile, pkg=self.pkg, pkg_path=self.pkg_path,
 			pretend=self.pretend, scheduler=self.scheduler)
 
@@ -62,6 +85,16 @@ class BinpkgFetcher(CompositeTask):
 			self._fetcher_exit_unlocked(fetcher)
 
 	def _fetcher_exit_unlocked(self, fetcher, unlock_task=None):
+		if not self.pretend and fetcher.returncode != os.EX_OK:
+			if self.retry and len(self.binpkg_format_pending) > 0:
+				# try other formats if current fetcher failed
+				self.binpkg_format = self.binpkg_format_pending.pop()
+				self.pkg_path = pkg.root_config.trees["bintree"].getname(
+					self.pkg.cpv, 
+					binpkg_format=self.binpkg_format) + ".partial"
+				self._start()
+				return
+
 		if unlock_task is not None:
 			self._assert_current(unlock_task)
 			if unlock_task.cancelled:
@@ -77,7 +110,8 @@ class BinpkgFetcher(CompositeTask):
 
 class _BinpkgFetcherProcess(SpawnProcess):
 
-	__slots__ = ("pkg", "pretend", "locked", "pkg_path", "_lock_obj")
+	__slots__ = ("pkg", "pretend", "locked", "pkg_path", "_lock_obj",
+		"binpkg_format")
 
 	def _start(self):
 		pkg = self.pkg
@@ -85,7 +119,7 @@ class _BinpkgFetcherProcess(SpawnProcess):
 		bintree = pkg.root_config.trees["bintree"]
 		settings = bintree.settings
 		pkg_path = self.pkg_path
-		binpkg_format = settings.get("BINPKG_FORMAT", "xpak")
+		binpkg_format = self.binpkg_format
 		if binpkg_format not in ("xpak", "gpkg"):
 			raise InvalidBinaryPackageFormat(binpkg_format)
 
