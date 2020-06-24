@@ -38,6 +38,10 @@ PORTAGE_TMPDIR="/var/tmp"
 # existing installs where bzip2 is used for backward compatibility.
 BINPKG_COMPRESS="zstd"
 
+# The format used for binary packages. The default is use old "xpak" format.
+# Set to "gpkg" to use new gentoo binary package format.
+BINPKG_FORMAT="xpak"
+
 # Fetching command (3 tries, passive ftp for firewall compatibility)
 FETCHCOMMAND="wget -t 3 -T 60 --passive-ftp -O \"\${DISTDIR}/\${FILE}\" \"\${URI}\""
 RESUMECOMMAND="wget -c -t 3 -T 60 --passive-ftp -O \"\${DISTDIR}/\${FILE}\" \"\${URI}\""
