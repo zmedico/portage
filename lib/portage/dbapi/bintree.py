@@ -417,10 +417,10 @@ class binarytree:
 			self._pkgindex_keys = self.dbapi._aux_cache_keys.copy()
 			self._pkgindex_keys.update(["CPV", "SIZE"])
 			self._pkgindex_aux_keys = \
-				["BASE_URI", "BDEPEND", "BUILD_ID", "BUILD_TIME", "CHOST",
-				"DEFINED_PHASES", "DEPEND", "DESCRIPTION", "EAPI",
-				"IUSE", "KEYWORDS", "LICENSE", "PDEPEND",
-				"PKGINDEX_URI", "PROPERTIES", "PROVIDES",
+				["BASE_URI", "BDEPEND", "BINPKG_FORMAT", "BUILD_ID", 
+				"BUILD_TIME", "CHOST", "DEFINED_PHASES", "DEPEND", 
+				"DESCRIPTION", "EAPI", "IUSE", "KEYWORDS", "LICENSE",
+				"PDEPEND", "PKGINDEX_URI", "PROPERTIES", "PROVIDES",
 				"RDEPEND", "repository", "REQUIRES", "RESTRICT",
 				"SIZE", "SLOT", "USE"]
 			self._pkgindex_aux_keys = list(self._pkgindex_aux_keys)
@@ -430,8 +430,8 @@ class binarytree:
 			self._pkgindex_header = None
 			self._pkgindex_header_keys = set([
 				"ACCEPT_KEYWORDS", "ACCEPT_LICENSE",
-				"ACCEPT_PROPERTIES", "ACCEPT_RESTRICT", "CBUILD",
-				"CONFIG_PROTECT", "CONFIG_PROTECT_MASK", "FEATURES",
+				"ACCEPT_PROPERTIES", "ACCEPT_RESTRICT", "BINPKG_FORMAT", 
+				"CBUILD", "CONFIG_PROTECT", "CONFIG_PROTECT_MASK", "FEATURES",
 				"GENTOO_MIRRORS", "INSTALL_MASK", "IUSE_IMPLICIT", "USE",
 				"USE_EXPAND", "USE_EXPAND_HIDDEN", "USE_EXPAND_IMPLICIT",
 				"USE_EXPAND_UNPREFIXED"])
@@ -455,7 +455,8 @@ class binarytree:
 				"SLOT"    : "0",
 				"USE"     : "",
 			}
-			self._pkgindex_inherited_keys = ["CHOST", "repository"]
+			self._pkgindex_inherited_keys = ["BINPKG_FORMAT", "CHOST", 
+				"repository"]
 
 			# Populate the header with appropriate defaults.
 			self._pkgindex_default_header_data = {
@@ -1505,6 +1506,7 @@ class binarytree:
 		st = os.lstat(pkg_path)
 		d["_mtime_"] = str(st[stat.ST_MTIME])
 		d["SIZE"] = str(st.st_size)
+		d["BINPKG_FORMAT"] = binpkg_format
 
 		rel_path = pkg_path[len(self.pkgdir)+1:]
 		# record location if it's non-default
