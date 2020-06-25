@@ -36,6 +36,16 @@ class tar_stream_writer(object):
 	Helper function that return a file-like object which
 	allowed streaming add new file to tar with optional external
 	program compression, without prior knows the file size.
+
+	Example:
+	Add "bin/emerge" as "emerge.tar.gz" to portage.tar using gzip compression
+
+	container = tarfile.open("portage.tar", "w")
+	file_tarinfo = tarfile.TarInfo("emerge.tar.gz")
+	with tar_stream_writer(file_tarinfo, container,
+		tarfile.USTAR_FORMAT, ["gzip"]) as writer:
+		with tarfile.open(mode='w|', fileobj=writer) as inner_tar:
+			inner_tar.add("bin/emerge")
 	"""
 	def __init__(self, tarinfo, container, tar_format, cmd=None):
 		"""
@@ -138,6 +148,15 @@ class tar_stream_reader(object):
 	Helper function that return a file-like object which
 	allowed stream reading file in tar with optional external
 	program decompression.
+
+	Example:
+	Extract "bin/emerge" from "emerge.tar.gz" in portage.tar 
+	using gzip decompression
+
+	container = tarfile.open("portage.tar", "r")
+	with tar_stream_reader(container, ["gzip", "-d"]) as reader:
+		with tarfile.open(mode='r|', fileobj=reader) as inner_tar:
+			inner_tar.extract("bin/emerge")
 	"""
 	def __init__(self, fileobj, cmd=None):
 		"""
