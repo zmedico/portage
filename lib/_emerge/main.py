@@ -1313,3 +1313,5 @@ def emerge_main(args=None):
 			if "porttree" in x.lazy_items:
 				continue
 			x["porttree"].dbapi.close_caches()
+		import resource
+		print('maxrss:', resource.getrusage(resource.RUSAGE_SELF).ru_maxrss, flush=True)
