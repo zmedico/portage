@@ -477,9 +477,8 @@ class checksum_helper(object):
 			else:
 				writemsg(colorize("BAD", "!!!" + "\n"
 					+ self.gpg_result.decode()))
-				writemsg(colorize("BAD", "!!!" + "\n"
-					+ self.gpg_output.decode()))
 				if self.gpg_operation == checksum_helper.SIGNING:
+					writemsg(colorize("BAD", self.gpg_output.decode()))
 					raise GPGException("GPG signing failed")
 				elif self.gpg_operation == checksum_helper.VERIFY:
 					raise InvalidSignature("GPG verify failed")
