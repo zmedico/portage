@@ -135,6 +135,27 @@ Defaults to "".
 BINPKG_COMPRESS_FLAGS="-9"
 .fi
 .TP
+\fBBINPKG_GPG_UNLOCK_COMMAND\fR = \fI"command to unlock the GPG signing key"\fR
+This variable is used to set GPG unlock command. The command will be run 
+before start build packages. If this variable is not set, no command will be 
+run. If GPG key is auto unlock on login, you do not need set this.
+The \fB${GPG_TTY}\fR variable is auto sets as current tty.
+Use \fBsudo\fR to isolate from root user is recommended.
+.TP
+\fBBINPKG_GPG_SIGNING_COMMAND\fR = \fI"command used to sign binary package \
+file"\fR
+This variable is used to set GPG signing command. The command is expected read
+from stdin. When EOF reached, use stdout to return the signature.
+Use \fBsudo\fR to isolate from root user is recommended.
+.TP
+\fBBINPKG_GPG_VERIFY_COMMAND\fR = \fI"command used to verify binary package"\
+\fR
+This variable is used to set GPG verify command. The command is expected read
+file data from stdin, and use signature located in \fB${SIGN_FILE}\fR to 
+verify the file. 
+Note: the \fB${SIGN_FILE}\fR cannot be expanded during portage initialization,
+which needed to be write as \fB\\${SIGN_FILE}\fR.
+.TP
 .B CBUILD
 This variable is passed by the \fIebuild scripts\fR to the \fIconfigure\fR
 as \fI\-\-build=${CBUILD}\fR only if it is defined.  Do not set this yourself
@@ -284,6 +305,11 @@ strips (or splits) them before installing.
 
 \fBbinpkg\-dostrip\fR must be enabled for \fBinstallsources\fR to work.
 .TP
+.B binpkg-ignore-signature
+This will disable GPG signature check for all binary packages. Enable this
+could be dangerous if you get binary packages from remote site or use third
+party packages.
+.TP
 .B binpkg\-logs
 Keep logs from successful binary package merges. This is relevant only when
 \fBPORTAGE_LOGDIR\fR is set.
@@ -314,6 +340,16 @@ BUILD_TIME metadata to select the latest builds.
 There is currently no automated way to prune old builds from PKGDIR,
 although it is possible to remove packages manually, and then run
 \(aqemaint \-\-fix binhost' to update the ${PKGDIR}/Packages index.
+.TP
+.B binpkg-request-signature
+Binary packages are requested to be signed by trusted GPG signature.
+Portage will reject to process any binary package without a valid GPG
+signature. The verify command is defined in 
+\fBBINPKG_GPG_VERIFY_COMMAND\fR variable.
+.TP
+.B binpkg-signing
+Binary packages will be signed by given GPG command. The signing command 
+is defined in \fBBINPKG_GPG_SIGNING_COMMAND\fR variable.
 .TP
 .B buildpkg
 Binary packages will be created for all packages that are merged. Also see
@@ -443,6 +479,10 @@ for all EAPIs (for obvious reasons).
 .B getbinpkg
 Force emerges to always try to fetch files from the \fIPORTAGE_BINHOST\fR.  See
 \fBmake.conf\fR(5) for more information.
+.TP
+.B gpg-keepalive
+Run GPG unlock command every 5 mins to avoid the passphrase expired.
+If your GPG is auto unlocked on login, you do not need this.
 .TP
 .B icecream
 Enable portage support for the icecream package.
