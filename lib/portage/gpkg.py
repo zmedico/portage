@@ -3,8 +3,6 @@
 
 import tarfile
 import io
-from datetime import datetime
-import warnings
 import threading
 import subprocess
 import errno
@@ -12,59 +10,85 @@ import pwd
 import grp
 import stat
 import sys
+import hashlib
+import tempfile
+import traceback
+import copy
+from datetime import datetime
 
+from portage import checksum
 from portage import os
 from portage import shutil
 from portage import normalize_path
 from portage import _encodings
 from portage import _unicode_decode
 from portage import _unicode_encode
-from portage.exception import InvalidData, FileNotFound, \
-	IncorrectParameter, InvalidBinaryPackageFormat, \
-	InvalidCompressionMethod, CompressorNotFound, \
-	CompressorOperationFailed
+from portage.exception import (InvalidData, FileNotFound,
+	IncorrectParameter, InvalidBinaryPackageFormat,
+	InvalidCompressionMethod, CompressorNotFound,
+	CompressorOperationFailed, CommandNotFound,
+	GPGException, DigestException, MissingSignature, 
+	InvalidSignature, UntrustedSignature, SecurityViolation)
 from portage.output import colorize
 from portage.util._urlopen import urlopen
 from portage.util import writemsg
 from portage.util import ensure_dirs, shlex_split, varexpand
 from portage.util.compression_probe import _compressors
 from portage.process import find_binary
+from portage.package.ebuild.config import config
+from portage.const import MANIFEST2_HASH_DEFAULTS, HASHING_BLOCKSIZE
 
 
 class tar_stream_writer(object):
 	"""
-	Helper function that return a file-like object which
-	allowed streaming add new file to tar with optional external
-	program compression, without prior knows the file size.
+	One-pass helper function that return a file-like object 
+	for create a file inside of a tar container.
+
+	This helper allowed streaming add a new file to tar
+	without prior knows the file size.
+
+	With optional call and pipe data through external program,
+	the helper can transparently save compressed data.
+
+	With optional checksum helper, this helper can create
+	corresponding checksum and GPG signature.
 
 	Example:
-	Add "bin/emerge" as "emerge.tar.gz" to portage.tar using gzip compression
 
-	container = tarfile.open("portage.tar", "w")
-	file_tarinfo = tarfile.TarInfo("emerge.tar.gz")
-	with tar_stream_writer(file_tarinfo, container,
-		tarfile.USTAR_FORMAT, ["gzip"]) as writer:
-		with tarfile.open(mode='w|', fileobj=writer) as inner_tar:
-			inner_tar.add("bin/emerge")
+	writer = tar_stream_writer(
+		file_tarinfo,            # the file tarinfo that need to be added
+		container,               # the outer container tarfile object
+		tarfile.USTAR_FORMAT,    # the outer container format
+		["gzip"],                # compression command
+		checksum_helper          # checksum helper
+	)
+
+	writer.write(data)
+	writer.close()
 	"""
-	def __init__(self, tarinfo, container, tar_format, cmd=None):
+	def __init__(self, tarinfo, container, tar_format, cmd=None,
+			checksum_helper=None):
 		"""
-		tarinfo should be the to be added file info.
-		container should be the exists container tarfile object.
-		cmd is optional external compressor command.
+		tarinfo          # the file tarinfo that need to be added
+		container        # the outer container tarfile object
+		tar_format       # the outer container format for create the tar header
+		cmd              # subprocess.Popen format compression command
+		checksum_helper  # checksum helper
 		"""
-		self.container = container
-		self.tarinfo = tarinfo
-		self.tar_format = tar_format
+		self.checksum_helper = checksum_helper
 		self.closed = False
+		self.container = container
+		self.killed = False
+		self.tar_format = tar_format
+		self.tarinfo = tarinfo
 
-		# record container end position
+		# Record container end position
 		self.container.fileobj.seek(0, io.SEEK_END)
 		self.begin_position = self.container.fileobj.tell()
 		self.end_position = 0
 		self.file_size = 0
 
-		# write tar header without size
+		# Write tar header without size
 		tar_header = self.tarinfo.tobuf(self.tar_format,
 			self.container.encoding,
 			self.container.errors)
@@ -73,14 +97,15 @@ class tar_stream_writer(object):
 		self.container.fileobj.flush()
 		self.container.offset += self.header_size
 
-		# start external compressor if needed
+		# Start external compressor if needed
 		if cmd is None:
 			self.proc = None
-			self.output = self.container.fileobj
 		else:
 			self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-				stdout=self.container.fileobj)
-			self.output = self.proc.stdin
+				stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+			self.read_thread = threading.Thread(target=self._cmd_read_thread,
+				name="tar_stream_cmd_read", daemon=True)
+			self.read_thread.start()
 
 	def __del__(self):
 		self.close()
@@ -91,14 +116,54 @@ class tar_stream_writer(object):
 	def __exit__(self, exc_type, exc_value, traceback):
 		self.close()
 
+	def kill(self):
+		"""
+		kill external program if any error happened in python
+		"""
+		if self.proc is not None:
+			self.killed = True
+			self.proc.stdin.close()
+			self.proc.kill()
+			self.close()
+
+	def _cmd_read_thread(self):
+		"""
+		Use thread to avoid block.
+		Read stdout from external compressor, then write to the file
+		in container, and to checksum helper if needed.
+		"""
+		while True:
+			try:
+				buffer = self.proc.stdout.read(HASHING_BLOCKSIZE)
+				if not buffer:
+					self.proc.stdout.close()
+					self.proc.stderr.close()
+					return
+			except BrokenPipeError:
+				self.proc.stdout.close()
+				if not self.killed:
+					# Do not raise error if killed by portage
+					raise CompressorOperationFailed("PIPE broken")
+
+			self.container.fileobj.write(buffer)
+			if self.checksum_helper:
+				self.checksum_helper.update(buffer)
+
 	def write(self, data):
 		"""
 		Write data to tarfile or external compressor stdin
 		"""
 		if self.closed:
 			raise OSError("writer closed")
+
+		if self.proc:
+			# Write to external program
+			self.proc.stdin.write(data)
 		else:
-			self.output.write(data)
+			# Write to container
+			self.container.fileobj.write(data)
+			if self.checksum_helper:
+				self.checksum_helper.update(data)
 
 	def close(self):
 		"""
@@ -107,20 +172,22 @@ class tar_stream_writer(object):
 		if self.closed:
 			return
 
-		# wait compressor exit
+		# Wait compressor exit
 		if self.proc is not None:
 			self.proc.stdin.close()
 			if self.proc.wait() != os.EX_OK:
 				raise CompressorOperationFailed("compression failed")
+			if self.read_thread.is_alive():
+				self.read_thread.join()
 
-		# get container end position and calculate file size
+		# Get container end position and calculate file size
 		self.container.fileobj.seek(0, io.SEEK_END)
 		self.end_position = self.container.fileobj.tell()
 		self.file_size = self.end_position - self.begin_position \
 			- self.header_size
 		self.tarinfo.size = self.file_size
 
-		# tar block is 512, need padding \0
+		# Tar block is 512, need padding \0
 		_, remainder = divmod(self.file_size, 512)
 		if remainder > 0:
 			padding_size = 512 - remainder
@@ -128,7 +195,7 @@ class tar_stream_writer(object):
 			self.container.offset += padding_size
 			self.container.fileobj.flush()
 
-		# update tar header
+		# Update tar header
 		tar_header = self.tarinfo.tobuf(self.tar_format,
 			self.container.encoding,
 			self.container.errors)
@@ -139,44 +206,53 @@ class tar_stream_writer(object):
 		self.container.offset = self.container.fileobj.tell()
 		self.closed = True
 
-		# add tarinfo to tarfile
+		# Add tarinfo to tarfile
 		self.container.members.append(self.tarinfo)
+
+		if self.checksum_helper:
+			self.checksum_helper.finish()
+
+		self.closed = True
 
 
 class tar_stream_reader(object):
 	"""
-	Helper function that return a file-like object which
-	allowed stream reading file in tar with optional external
-	program decompression.
+	helper function that return a file-like object 
+	for read a file inside of a tar container.
 
-	Example:
-	Extract "bin/emerge" from "emerge.tar.gz" in portage.tar 
-	using gzip decompression
+	This helper allowed transparently streaming read a compressed
+	file in tar.
+	
+	With optional call and pipe compressed data through external
+	program, and return the uncompressed data.
 
-	container = tarfile.open("portage.tar", "r")
-	with tar_stream_reader(container, ["gzip", "-d"]) as reader:
-		with tarfile.open(mode='r|', fileobj=reader) as inner_tar:
-			inner_tar.extract("bin/emerge")
+	reader = tar_stream_reader(
+		fileobj,             # the fileobj from tarfile.extractfile(f)
+		["gzip", "-d"],      # decompression command
+	)
+
+	reader.read()
+	reader.close()
 	"""
 	def __init__(self, fileobj, cmd=None):
 		"""
 		fileobj should be a file-like object that have read().
 		cmd is optional external decompressor command.
 		"""
-		self.fileobj = fileobj
 		self.closed = False
 		self.cmd = cmd
+		self.fileobj = fileobj
 		self.killed = False
 
 		if cmd is None:
 			self.read_io = fileobj
 			self.proc = None
 		else:
-			# start external decompressor
+			# Start external decompressor
 			self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-				stdout=subprocess.PIPE)
+				stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 			self.read_io = self.proc.stdout
-			# start stdin block writing thread
+			# Start stdin block writing thread
 			self.thread = threading.Thread(target=self._write_thread,
 				name="tar_stream_stdin_writer", daemon=True)
 			self.thread.start()
@@ -201,19 +277,31 @@ class tar_stream_reader(object):
 		writing thread to avoid full buffer blocking
 		"""
 		try:
-			self.proc.stdin.write(self.fileobj.read())
-			self.proc.stdin.flush()
+			while True:
+				buffer = self.fileobj.read(HASHING_BLOCKSIZE)
+				if buffer:
+					try:
+						self.proc.stdin.write(buffer)
+					except ValueError:
+						if self.killed:
+							return
+						else:
+							raise
+				else:
+					self.proc.stdin.flush()
+					self.proc.stdin.close()
+					break
 		except BrokenPipeError:
 			if self.killed is False:
 				raise CompressorOperationFailed("PIPE broken")
 
-		# close stdin after finished
-		self.proc.stdin.close()
-
 	def kill(self):
-		# kill proc if any error happened in python
+		"""
+		kill external program if any error happened in python
+		"""
 		if self.proc is not None:
 			self.killed = True
+			self.proc.stdin.close()
 			self.proc.kill()
 			self.close()
 
@@ -227,15 +315,174 @@ class tar_stream_reader(object):
 			return self.read_io.read(bufsize)
 
 	def close(self):
+		"""
+		wait external program complete and do clean up
+		"""
 		if self.closed:
 			return
 
+		self.closed = True
+
 		if self.proc is not None:
 			self.thread.join()
-			self.proc.stdout.close()
-			if self.proc.wait() != os.EX_OK:
-				raise CompressorOperationFailed("decompression failed")
-		self.closed = True
+			try:
+				if self.proc.wait() != os.EX_OK:
+					if not self.proc.stderr.closed:
+						stderr = self.proc.stderr.read().decode()
+					if not self.killed:
+						writemsg(colorize("BAD", "!!!" + "\n" + stderr))
+						raise CompressorOperationFailed("decompression failed")
+			finally:
+				self.proc.stdout.close()
+				self.proc.stderr.close()
+
+
+class checksum_helper(object):
+	"""
+	Do checksum generation and GPG Signature generation and verification
+	"""
+	SIGNING = 0
+	VERIFY = 1
+
+	def __init__(self, settings, gpg_operation=None, signature=None):
+		"""
+		settings         # portage settings
+		gpg_operation    # either SIGNING or VERIFY
+		signature        # GPG signature string used for GPG verify only
+		"""
+		self.settings = settings
+		self.gpg_operation = gpg_operation
+		self.gpg_proc = None
+		self.gpg_result = None
+		self.gpg_output = None
+		self.finished = False
+
+		# Initialize the hash libs
+		self.libs = {}
+		for hash_name in MANIFEST2_HASH_DEFAULTS:
+			self.libs[hash_name] = (checksum.hashfunc_map[hash_name]
+				._hashobject())
+
+		# GPG
+		if self.gpg_operation == checksum_helper.SIGNING:
+			self.GPG_signing_command = self.settings.get(
+				"BINPKG_GPG_SIGNING_COMMAND", None)
+
+			if self.GPG_signing_command:
+				self.GPG_signing_command = shlex_split(
+					varexpand(self.GPG_signing_command, mydict=self.settings))
+				self.GPG_signing_command = [
+					x for x in self.GPG_signing_command if x != ""]
+				try:
+					os.environ["GPG_TTY"] = os.ttyname(sys.stdout.fileno())
+				except OSError:
+					pass
+			else:
+				raise CommandNotFound("GPG signing command is not set")
+
+			self.gpg_proc = subprocess.Popen(self.GPG_signing_command,
+				stdin=subprocess.PIPE, stdout=subprocess.PIPE, 
+				stderr=subprocess.PIPE)
+
+		elif self.gpg_operation == checksum_helper.VERIFY:
+			if signature is None:
+				raise MissingSignature("No signature provided")
+
+			self.GPG_verify_command = self.settings.get(
+				"BINPKG_GPG_VERIFY_COMMAND", None)
+
+			if self.GPG_verify_command:
+				self.sign_file_fd, self.sign_file_path = tempfile.mkstemp(
+					".sig", "portage-sign-")
+
+				# Use local settings to add signature file path
+				local_settings = config(clone=self.settings)
+				local_settings["SIGN_FILE"] = self.sign_file_path
+
+				# Create signature file and allow everyone read
+				with open(self.sign_file_fd, "wb") as sign:
+					sign.write(signature)
+				os.chmod(self.sign_file_path, 0o644)
+
+				self.GPG_verify_command = shlex_split(
+					varexpand(self.GPG_verify_command, mydict=local_settings))
+				self.GPG_verify_command = [
+					x for x in self.GPG_verify_command if x != ""]
+			else:
+				raise CommandNotFound("GPG signing command is not set")
+
+			self.gpg_proc = subprocess.Popen(self.GPG_verify_command,
+				stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+				stderr=subprocess.PIPE)
+
+	def __del__(self):
+		self.finish()
+
+	def _check_gpg_status(self, gpg_status):
+		"""
+		Check GPG status log for extra info.
+		GPG will return OK even if the signature owner is not trusted.
+		"""
+		good_signature = False
+		trust_signature = False
+
+		for l in gpg_status.splitlines():
+			if l.startswith('[GNUPG:] GOODSIG'):
+				good_signature = True
+
+			if (l.startswith('[GNUPG:] TRUST_ULTIMATE')
+				or l.startswith('[GNUPG:] TRUST_FULLY')):
+				trust_signature = True
+
+		if (not good_signature) or (not trust_signature):
+			writemsg(colorize("BAD", "!!!" + "\n" + self.gpg_result.decode()))
+			raise InvalidSignature("GPG verify failed")
+
+	def update(self, data):
+		"""
+		Write data to hash libs and GPG stdin.
+		"""
+		for c in self.libs:
+			self.libs[c].update(data)
+
+		if self.gpg_proc is not None:
+			self.gpg_proc.stdin.write(data)
+
+	def finish(self):
+		"""
+		Tell GPG file is EOF, and get results, then do clean up.
+		"""
+		if self.finished:
+			return
+
+		if self.gpg_proc is not None:
+			# Tell GPG EOF
+			self.gpg_proc.stdin.close()
+
+			return_code = self.gpg_proc.wait()
+
+			if self.gpg_operation == checksum_helper.VERIFY:
+				os.remove(self.sign_file_path)
+
+			self.finished = True
+
+			self.gpg_result = self.gpg_proc.stderr.read()
+			self.gpg_output = self.gpg_proc.stdout.read()
+			self.gpg_proc.stdout.close()
+			self.gpg_proc.stderr.close()
+
+			if return_code == os.EX_OK:
+				if self.gpg_operation == checksum_helper.VERIFY:
+					self._check_gpg_status(self.gpg_output.decode())
+			else:
+				writemsg(colorize("BAD", "!!!" + "\n"
+					+ self.gpg_result.decode()))
+				writemsg(colorize("BAD", "!!!" + "\n"
+					+ self.gpg_output.decode()))
+				if self.gpg_operation == checksum_helper.SIGNING:
+					raise GPGException("GPG signing failed")
+				elif self.gpg_operation == checksum_helper.VERIFY:
+					raise InvalidSignature("GPG verify failed")
 
 
 class gpkg(object):
@@ -262,8 +509,9 @@ class gpkg(object):
 			self.gpkg_file = _unicode_decode(gpkg_file,
 				encoding=_encodings['fs'], errors='strict')
 		self.base_name = base_name
+		self.checksums = []
 
-		# compression is the compression algorithm, if set to None will 
+		# Compression is the compression algorithm, if set to None will 
 		# not use compression.
 		self.compression = self.settings.get("BINPKG_COMPRESS", None)
 		if self.compression in ["", "none"]:
@@ -275,44 +523,26 @@ class gpkg(object):
 		except ValueError:
 			self.compresslevel = 9
 
-		# create_signature is whether create signature for the package or not.
-		self.create_signature = self.settings.get("BINPKG_CREATE_SIGNING", False)
-		if not isinstance(self.create_signature, bool):
-			self.create_signature = self.create_signature.lower()
-			if self.create_signature in ["", "false", "0"]:
-				self.create_signature = False
-			elif self.create_signature in ["1", "true"]:
-				self.create_signature = True
-			else:
-				raise IncorrectParameter("Invalid BINPKG_CREATE_SIGNING flag: "
-					+ self.create_signature)
+		# The create_signature is whether create signature for the package or not.
+		if "binpkg-signing" in self.settings.features:
+			self.create_signature = True
+		else:
+			self.create_signature = False
 
-		# request_signature is whether signature files are mandatory.
+		# The rquest_signature is whether signature files are mandatory.
 		# If set true, any missing signature file will cause reject processing.
-		self.request_signature = self.settings.get("BINPKG_REQUEST_SIGNING", False)
-		if not isinstance(self.request_signature, bool):
-			self.request_signature = self.request_signature.lower()
-			if self.request_signature in ["", "false", "0"]:
-				self.request_signature = False
-			elif self.request_signature in ["1", "true"]:
-				self.request_signature = True
-			else:
-				raise IncorrectParameter("Invalid BINPKG_REQUEST_SIGNING flag: "
-					+ self.request_signature)
+		if "binpkg-request-signature" in self.settings.features:
+			self.request_signature = True
+		else:
+			self.request_signature = False
 
-		# verify_signature is whether verify package signature or not,
+		# The verify_signature is whether verify package signature or not.
 		# In rare case user may want to ignore signature,
 		# E.g. package with expired signature.
-		self.verify_signature = self.settings.get("BINPKG_VERIFY_SIGNING", True)
-		if not isinstance(self.verify_signature, bool):
-			self.verify_signature = self.verify_signature.lower()
-			if self.verify_signature in ["false", "0"]:
-				self.verify_signature = False
-			elif self.verify_signature in ["", "1", "true"]:
-				self.verify_signature = True
-			else:
-				raise IncorrectParameter("Invalid BINPKG_VERIFY_SIGNING flag: "
-					+ self.verify_signature)
+		if "binpkg-ignore-signature" in self.settings.features:
+			self.verify_signature = False
+		else:
+			self.verify_signature = True
 
 		self.ext_list = {"gzip": ".gz", "bzip2": ".bz2", "lz4": ".lz4",
 			"lzip": ".lz", "lzop": ".lzo", "xz": ".xz", "zstd": ".zst"}
@@ -323,6 +553,8 @@ class gpkg(object):
 		If dest_dir is None, return files and values in dict.
 		The dict key will be UTF-8, not bytes.
 		"""
+		self._verify_binpkg(metadata_only=True)
+
 		with tarfile.open(self.gpkg_file, 'r') as container:
 			metadata_tarinfo, metadata_comp = self._get_inner_tarinfo(
 				container, 'metadata')
@@ -367,15 +599,17 @@ class gpkg(object):
 		This method only support the correct package format.
 		Wrong files order or incorrect basename will be considered invalid
 		to reduce potential attacks.
+		Only signature will be check if the signature file is the next file.
+		Manifest will be ignored since it will be at the end of package.
 		"""
-		# the init download file head size
+		# The init download file head size
 		init_size = 51200
 
-		# load remote container
+		# Load remote container
 		container_file = io.BytesIO(urlopen(url, headers={
 			'Range': 'bytes=0-' + str(init_size)}).read())
 
-		# check gpkg and metadata
+		# Check gpkg and metadata
 		with tarfile.open(mode='r', fileobj=container_file) as container:
 			if self.gpkg_version not in container.getnames():
 				raise InvalidBinaryPackageFormat("Invalid gpkg file.")
@@ -383,8 +617,9 @@ class gpkg(object):
 			metadata_tarinfo, metadata_comp = self._get_inner_tarinfo(
 				container, 'metadata')
 
+			# Extra 10240 bytes for signature
 			end_size = metadata_tarinfo.offset_data \
-				+ metadata_tarinfo.size + 2048
+				+ metadata_tarinfo.size + 10240
 			_, remainder = divmod(end_size, 512)
 			end_size += 512 - remainder
 
@@ -400,11 +635,26 @@ class gpkg(object):
 
 		container_file.seek(0)
 
-		# reload and process full metadata
+		# Reload and process full metadata
 		with tarfile.open(mode='r', fileobj=container_file) as container:
 			metadata_tarinfo, metadata_comp = self._get_inner_tarinfo(
 				container, 'metadata')
 
+			# Verify metadata file signature if needed
+			# binpkg-ignore-signature can override this.
+			signature_filename = metadata_tarinfo.name + ".sig"
+			if signature_filename in container.getnames():
+				if (self.request_signature and self.verify_signature):
+					metadata_signature = container.extractfile(
+						signature_filename).read()
+					checksum_info = checksum_helper(self.settings,
+						gpg_operation=checksum_helper.VERIFY,
+						signature=metadata_signature)
+					checksum_info.update(
+						container.extractfile(metadata_tarinfo).read())
+					checksum_info.finish()
+
+			# Load metadata
 			with tar_stream_reader(container.extractfile(metadata_tarinfo),
 				self._get_decompression_cmd(metadata_comp)) \
 				as metadata_reader:
@@ -447,21 +697,32 @@ class gpkg(object):
 		container.addfile(gpkg_version_file)
 
 		compression_cmd = self._get_compression_cmd()
+
 		# metadata
 		self._add_metadata(container, metadata, compression_cmd)
 
-		if self.create_signature:
-			pass
-
 		# image
+		if self.create_signature:
+			checksum_info = checksum_helper(self.settings,
+				gpg_operation=checksum_helper.SIGNING)
+		else:
+			checksum_info = checksum_helper(self.settings)
+
 		image_tarinfo = self._create_tarinfo("image")
 		image_tarinfo.mtime = datetime.utcnow().timestamp()
 		with tar_stream_writer(image_tarinfo, container,
-			image_tar_format, compression_cmd) as image_writer:
+			image_tar_format, compression_cmd, checksum_info) as image_writer:
 			with tarfile.open(mode='w|', fileobj=image_writer,
 				format=image_tar_format) as image_tar:
 				image_tar.add(root_dir, ".", recursive=True)
 
+		image_tarinfo = container.getmember(image_tarinfo.name)
+		self._record_checksum(checksum_info, image_tarinfo)
+
+		if self.create_signature:
+			self._add_signature(checksum_info, image_tarinfo, container)
+
+		self._add_manifest(container)
 		container.close()
 
 	def decompress(self, decompress_dir):
@@ -471,8 +732,7 @@ class gpkg(object):
 		decompress_dir = normalize_path(_unicode_decode(decompress_dir,
 			encoding=_encodings['fs'], errors='strict'))
 
-		if self.gpkg_file is None:
-			raise FileNotFound("no gpkg file provided")
+		self._verify_binpkg()
 
 		with tarfile.open(self.gpkg_file, 'r') as container:
 			image_tarinfo, image_comp = \
@@ -484,6 +744,9 @@ class gpkg(object):
 				with tarfile.open(mode='r|', fileobj=image_tar) as image:
 					try:
 						image.extractall(decompress_dir)
+					except:
+						e = sys.exc_info()[0]
+						writemsg(colorize("BAD", "!!!" + "\n" + e))
 					finally:
 						image_tar.kill()
 
@@ -491,15 +754,8 @@ class gpkg(object):
 		"""
 		Update metadata in the gpkg file.
 		"""
-		if self.gpkg_file is None:
-			raise FileNotFound("no gpkg file provided")
-
-		if not os.path.isfile(self.gpkg_file):
-			raise FileNotFound(self.gpkg_file)
-
-		with tarfile.open(self.gpkg_file, 'r') as container:
-			if self.gpkg_version not in container.getnames():
-				raise InvalidBinaryPackageFormat("Invalid gpkg file.")
+		self._verify_binpkg()
+		self.checksums = []
 
 		with open(self.gpkg_file, 'rb') as container:
 			container_tar_format = self._get_tar_format(container)
@@ -520,14 +776,20 @@ class gpkg(object):
 			# metadata
 			self._add_metadata(container, metadata, compression_cmd)
 
-			if self.create_signature:
-				pass
-
 			# reuse image
 			with tarfile.open(self.gpkg_file, 'r') \
 				as container_old:
 				image_old_tarinfo, image_old_comp = \
 					self._get_inner_tarinfo(container_old, 'image')
+
+				manifest_old = self._load_manifest(
+					container_old.extractfile("Manifest"
+						).read().decode("UTF-8"))
+				
+				for m in manifest_old:
+					if m[1] == image_old_tarinfo.name:
+						self.checksums.append(m)
+						break
 				
 				container.addfile(image_old_tarinfo,
 					container_old.extractfile(image_old_tarinfo))
@@ -538,6 +800,8 @@ class gpkg(object):
 						image_sign_old_name)
 					container.addfile(image_sign_tarinfo,
 						container_old.extractfile(image_sign_tarinfo))
+
+			self._add_manifest(container)
 
 		shutil.move(tmp_gpkg_file_name, self.gpkg_file)
 
@@ -550,8 +814,15 @@ class gpkg(object):
 		metadata_tarinfo = self._create_tarinfo('metadata')
 		metadata_tarinfo.mtime = datetime.utcnow().timestamp()
 
+		if self.create_signature:
+			checksum_info = checksum_helper(self.settings,
+				gpg_operation=checksum_helper.SIGNING)
+		else:
+			checksum_info = checksum_helper(self.settings)
+
 		with tar_stream_writer(metadata_tarinfo, container,
-			tarfile.USTAR_FORMAT, compression_cmd) as metadata_writer:
+			tarfile.USTAR_FORMAT, compression_cmd, checksum_info
+			) as metadata_writer:
 			with tarfile.open(mode='w|', fileobj=metadata_writer,
 				format=tarfile.USTAR_FORMAT) as metadata_tar:
 
@@ -569,6 +840,12 @@ class gpkg(object):
 					m_data.seek(0)
 					metadata_tar.addfile(m_info, m_data)
 					m_data.close()
+
+		metadata_tarinfo = container.getmember(metadata_tarinfo.name)
+		self._record_checksum(checksum_info, metadata_tarinfo)
+
+		if self.create_signature:
+			self._add_signature(checksum_info, metadata_tarinfo, container)
 
 	def _quickpkg(self, contents, metadata, root_dir, protect=None):
 		"""
@@ -591,26 +868,33 @@ class gpkg(object):
 			self._get_tar_format_from_stats(
 				*self._check_pre_quickpkg_files(contents, root_dir))
 
-		# gpkg container
+		# GPKG container
 		container = tarfile.TarFile(name=self.gpkg_file, mode='w',
 			format=container_tar_format)
 
-		# gpkg version
+		# GPKG version
 		gpkg_version_file = tarfile.TarInfo(self.gpkg_version)
 		gpkg_version_file.mtime = datetime.utcnow().timestamp()
 		container.addfile(gpkg_version_file)
 
 		compression_cmd = self._get_compression_cmd()
-		# metadata
+		# Metadata
 		self._add_metadata(container, metadata, compression_cmd)
 
-		# image
+		# Image
+		if self.create_signature:
+			checksum_info = checksum_helper(self.settings,
+				gpg_operation=checksum_helper.SIGNING)
+		else:
+			checksum_info = checksum_helper(self.settings)
+
 		paths = list(contents)
 		paths.sort()
 		image_tarinfo = self._create_tarinfo("image")
 		image_tarinfo.mtime = datetime.utcnow().timestamp()
 		with tar_stream_writer(image_tarinfo, container,
-			image_tar_format, compression_cmd) as image_writer:
+			image_tar_format, compression_cmd, checksum_info
+			) as image_writer:
 			with tarfile.open(mode='w|', fileobj=image_writer,
 				format=image_tar_format) as image_tar:
 				for path in paths:
@@ -695,7 +979,282 @@ class gpkg(object):
 
 					else:
 						image_tar.addfile(tarinfo)
+
+		image_tarinfo = container.getmember(image_tarinfo.name)
+		self._record_checksum(checksum_info, image_tarinfo)
+
+		if self.create_signature:
+			self._add_signature(checksum_info, image_tarinfo, container)
+
+		self._add_manifest(container)
 		container.close()
+
+	def _record_checksum(self, checksum_info, tarinfo):
+		"""
+		Record checksum result for the given file.
+		Replace old checksum if already exists.
+		"""
+		for c in self.checksums:
+			if c[1] == tarinfo.name:
+				self.checksums.remove(c)
+				break
+
+		checksum_record = ["MANIFEST", tarinfo.name, str(tarinfo.size)]
+
+		for c in checksum_info.libs:
+			checksum_record.append(c)
+			checksum_record.append(checksum_info.libs[c].hexdigest())
+
+		self.checksums.append(checksum_record)
+
+	def _add_manifest(self, container):
+		"""
+		Add Manifest to the container based on current checksums.
+		Creare GPG signatue if needed.
+		"""
+		manifest = io.BytesIO()
+
+		for m in self.checksums:
+			manifest.write((" ".join(m) + "\n").encode("UTF-8"))
+
+		manifest_tarinfo = tarfile.TarInfo("Manifest")
+		manifest_tarinfo.size = manifest.tell()
+		manifest_tarinfo.mtime = datetime.utcnow().timestamp()
+		manifest.seek(0)
+		container.addfile(manifest_tarinfo, manifest)
+
+		if self.create_signature:
+			checksum_info = checksum_helper(self.settings,
+				gpg_operation=checksum_helper.SIGNING)
+			checksum_info.update(manifest.getvalue())
+			checksum_info.finish()
+			self._add_signature(checksum_info, manifest_tarinfo, container)
+
+		manifest.close()
+
+	def _load_manifest(self, manifest_string):
+		"""
+		Check, load, and return manifest in a list by files
+		"""
+		manifest = []
+		manifest_filenames = []
+
+		for manifest_record in manifest_string.splitlines():
+			if manifest_record == "":
+				continue
+			manifest_record = manifest_record.strip().split()
+
+			if manifest_record[0] != "MANIFEST":
+				raise DigestException("invalied Manifest")
+
+			if manifest_record[1] in manifest_filenames:
+				raise DigestException("Manifest duplicate file exists")
+
+			try:
+				int(manifest_record[2])
+			except ValueError:
+				raise DigestException("Manifest invalied file size")
+
+			manifest.append(manifest_record)
+			manifest_filenames.append(manifest_record[1])
+
+		return manifest
+
+	def _add_signature(self, checksum_info, tarinfo, container):
+		"""
+		Add GPG signature for the given tarinfo file.
+		"""
+		if checksum_info.gpg_output is None:
+			raise GPGException("GPG signature is not exists")
+
+		signature = io.BytesIO(checksum_info.gpg_output)
+		signature_tarinfo = tarfile.TarInfo(tarinfo.name + ".sig")
+		signature_tarinfo.size = len(signature.getvalue())
+		signature_tarinfo.mtime = datetime.utcnow().timestamp()
+		container.addfile(signature_tarinfo, signature)
+
+		signature.close()
+
+	def _verify_binpkg(self, metadata_only=False):
+		"""
+		Verify current GPKG file.
+		"""
+		# Check file path
+		if self.gpkg_file is None:
+			raise FileNotFound("no gpkg file provided")
+
+		# Check if is file
+		if not os.path.isfile(self.gpkg_file):
+			raise FileNotFound(self.gpkg_file)
+
+		# Check if is tar file
+		with open(self.gpkg_file, 'rb') as container:
+			container_tar_format = self._get_tar_format(container)
+			if container_tar_format is None:
+				raise InvalidBinaryPackageFormat('Cannot identify tar format')
+
+		# Check container
+		with tarfile.open(self.gpkg_file, 'r') as container:
+			container_files = container.getnames()
+
+			# Check gpkg header
+			if self.gpkg_version not in container_files:
+				raise InvalidBinaryPackageFormat("Invalid gpkg file.")
+
+			# If any signature exists, we assume all files have signature.
+			if any(f.endswith(".sig") for f in container_files):
+				signature_exist = True
+			else:
+				signature_exist = False
+
+			# Check if all files are unique to avoid same name attack
+			container_files_unique = []
+			for f in container_files:
+				if f in container_files_unique:
+					raise InvalidBinaryPackageFormat(
+						"Duplicate file %s exist, potential attack?"
+						% f)
+				container_files_unique.append(f)
+
+			del container_files_unique
+
+			# Add all files to check list
+			unverified_files = container_files.copy()
+			unverified_files.remove(self.gpkg_version)
+
+			# Check Manifest file
+			if "Manifest" not in unverified_files:
+				raise MissingSignature("Manifest not found")
+
+			manifest_file = container.extractfile("Manifest")
+			manifest_data = manifest_file.read()
+			manifest_file.close()
+
+			# Check Manifest signature if needed.
+			# binpkg-ignore-signature can override this.
+			if ((self.request_signature or signature_exist)
+				and self.verify_signature):
+				if "Manifest.sig" in unverified_files:
+					signature_file = container.extractfile("Manifest.sig")
+					signature = signature_file.read()
+					signature_file.close()
+
+					checksum_info = checksum_helper(self.settings,
+						gpg_operation=checksum_helper.VERIFY,
+						signature=signature)
+
+					checksum_info.update(manifest_data)
+					checksum_info.finish()
+
+					unverified_files.remove("Manifest")
+					unverified_files.remove("Manifest.sig")
+				else:
+					raise MissingSignature("Manifest signature not found")
+			else:
+				unverified_files.remove("Manifest")
+				if "Manifest.sig" in unverified_files:
+					unverified_files.remove("Manifest.sig")
+
+			# Load manifest and create manifest check list
+			manifest = self._load_manifest(manifest_data.decode("UTF-8"))
+			unverified_manifest = manifest.copy()
+
+			# Check all remaining files
+			for f in unverified_files.copy():
+				# Ignore signature file checksum
+				if f.endswith(".sig"):
+					continue
+
+				f_signature = f + ".sig"
+
+				# Find current file manifest record			
+				manifest_record = None
+				for m in manifest:
+					if m[1] == f:
+						manifest_record = m
+
+				if manifest_record is None:
+					raise DigestException("%s checksum not found" % f)
+
+				if int(manifest_record[2]) != int(container.getmember(f).size):
+					raise DigestException("%s file size mismatched" % f)
+				
+				# Ignore image file and signature if not needed
+				if (os.path.basename(f).startswith("image") and metadata_only):
+					unverified_files.remove(f)
+					unverified_manifest.remove(manifest_record)
+
+					# And its signature
+					if f_signature in unverified_files:
+						unverified_files.remove(f_signature)
+						for m in unverified_manifest:
+							if m[1] == f_signature:
+								unverified_manifest.remove(m)
+								break
+					continue
+
+				# Verify current file signature if needed
+				# binpkg-ignore-signature can override this.
+				if ((self.request_signature or signature_exist)
+					and self.verify_signature):
+					if f_signature in unverified_files:
+						signature_file = container.extractfile(f_signature)
+						signature = signature_file.read()
+						signature_file.close()
+						checksum_info = checksum_helper(self.settings,
+							gpg_operation=checksum_helper.VERIFY,
+							signature=signature)
+					else:
+						raise MissingSignature("%s signature not found" % f) 
+				else:
+					checksum_info = checksum_helper(self.settings)
+				
+				# Verify current file checksum
+				f_io = container.extractfile(f)
+				while True:
+					buffer = f_io.read(HASHING_BLOCKSIZE)
+					if buffer:
+						checksum_info.update(buffer)
+					else:
+						checksum_info.finish()
+						break
+				f_io.close()
+				
+				# At least one supported checksum must be checked
+				verified_hash_count = 0
+				for c in checksum_info.libs:
+					try:
+						if (checksum_info.libs[c].hexdigest().lower() == 
+							manifest_record[manifest_record.index(c) + 1].lower()):
+							verified_hash_count += 1
+						else:
+							raise DigestException("%s checksum mismatched" % f)
+					except KeyError:
+						# Checksum method not supported
+						pass
+
+				if verified_hash_count < 1:
+					raise DigestException("%s no supported checksum found" % f)
+
+				# Current file verified
+				unverified_files.remove(f)
+				unverified_manifest.remove(manifest_record)
+				if f_signature in unverified_files:
+					unverified_files.remove(f_signature)
+					for m in unverified_manifest:
+						if m[1] == f_signature:
+							unverified_manifest.remove(m)
+							break
+
+		# Check if any file IN Manifest but NOT IN binary package
+		if len(unverified_manifest) != 0:
+			raise DigestException("Missing files: %s"
+				% str(unverified_manifest))
+
+		# Check if any file NOT IN Manifest but IN binary package
+		if len(unverified_files) != 0:
+			raise DigestException("Unknown files exists: %s"
+				% str(unverified_files))
 
 	def _generate_metadata_from_dir(self, metadata_dir):
 		"""
@@ -782,17 +1341,17 @@ class gpkg(object):
 		Choose the corresponding tar format according to 
 		the image information
 		"""
-		# max possible size in UStar is 8 GiB (8589934591 bytes)
+		# Max possible size in UStar is 8 GiB (8589934591 bytes)
 		# stored in 11 octets
-		# use 8000000000, just in case we need add something extra
+		# Use 8000000000, just in case we need add something extra
 
-		# total size > 8 GiB, container need use GNU tar format
+		# Total size > 8 GiB, container need use GNU tar format
 		if image_total_size < 8000000000:
 			container_tar_format = tarfile.USTAR_FORMAT
 		else:
 			container_tar_format = tarfile.GNU_FORMAT
 
-		# image at least one file > 8 GiB, image need use GNU tar format
+		# Image at least one file > 8 GiB, image need use GNU tar format
 		if image_max_file_size < 8000000000:
 			image_tar_format = tarfile.USTAR_FORMAT
 		else:
@@ -856,7 +1415,7 @@ class gpkg(object):
 				try:
 					file_size = os.path.getsize(f)
 				except FileNotFoundError:
-					# ignore file not found if symlink to non-existing file
+					# Ignore file not found if symlink to non-existing file
 					if os.path.islink(f):
 						continue
 					else:
@@ -900,7 +1459,7 @@ class gpkg(object):
 				try:
 					file_size = os.path.getsize(path)
 				except FileNotFoundError:
-					# ignore file not found if symlink to non-existing file
+					# Ignore file not found if symlink to non-existing file
 					if os.path.islink(path):
 						continue
 					else:
@@ -951,7 +1510,7 @@ class gpkg(object):
 		if self.gpkg_version not in tar.getnames():
 			raise InvalidBinaryPackageFormat("Invalid gpkg file.")
 
-		# try get file with correct basename
+		# Try get file with correct basename
 		inner_tarinfo = None
 		if self.base_name is None:
 			base_name = ""
@@ -968,7 +1527,7 @@ class gpkg(object):
 				if f_name == file_name:
 					return f, f_comp
 
-		# if failed, try get any file name matched
+		# If failed, try get any file name matched
 		if inner_tarinfo is None:
 			for f in all_files: 
 				try:
@@ -977,10 +1536,10 @@ class gpkg(object):
 					continue
 				if f_name == file_name:
 					if self.base_name is not None:
-						warnings.warn('Package basename mismatched, using ' +
-							f.name, RuntimeWarning)
+						writemsg(colorize("WARN",
+							'Package basename mismatched, using ' + f.name))
 					self.base_name_alt = os.path.dirname(f.name)
 					return f, f_comp
 
-		# not found
+		# Not found
 		raise FileNotFound(file_name)
