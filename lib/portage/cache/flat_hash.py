@@ -1,8 +1,6 @@
-# Copyright 2005-2019 Gentoo Authors
+# Copyright 2005-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 # Author(s): Brian Harring (ferringb@gentoo.org)
-
-from __future__ import unicode_literals
 
 from portage.cache import fs_template
 from portage.cache import cache_errors
@@ -18,9 +16,6 @@ from portage import _unicode_encode
 from portage.exception import InvalidData
 from portage.versions import _pkg_str
 
-if sys.hexversion >= 0x3000000:
-	# pylint: disable=W0622
-	long = int
 
 class database(fs_template.FsBased):
 

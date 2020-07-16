@@ -1,7 +1,7 @@
-# Copyright 1998-2019 Gentoo Authors
+# Copyright 1998-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-from __future__ import division, unicode_literals
+from __future__ import division
 
 __all__ = [
 	"vardbapi", "vartree", "dblink"] + \
@@ -36,7 +36,6 @@ portage.proxy.lazyimport.lazyimport(globals(),
 	'portage.util.install_mask:install_mask_dir,InstallMask,_raise_exc',
 	'portage.util.listdir:dircache,listdir',
 	'portage.util.movefile:movefile',
-	'portage.util.monotonic:monotonic',
 	'portage.util.path:first_existing,iter_parents',
 	'portage.util.writeable_check:get_ro_checker',
 	'portage.util._xattr:xattr',
@@ -110,13 +109,6 @@ try:
 except ImportError:
 	import pickle
 
-if sys.hexversion >= 0x3000000:
-	# pylint: disable=W0622
-	basestring = str
-	long = int
-	_unicode = str
-else:
-	_unicode = unicode
 
 class vardbapi(dbapi):
 
@@ -354,7 +346,7 @@ class vardbapi(dbapi):
 	def cpv_counter(self, mycpv):
 		"This method will grab the COUNTER. Returns a counter value."
 		try:
-			return long(self.aux_get(mycpv, ["COUNTER"])[0])
+			return int(self.aux_get(mycpv, ["COUNTER"])[0])
 		except (KeyError, ValueError):
 			pass
 		writemsg_level(_("portage: COUNTER for %s was corrupted; " \
@@ -407,7 +399,7 @@ class vardbapi(dbapi):
 			if not isvalidatom(newcp, eapi=mycpv.eapi):
 				continue
 
-			mynewcpv = mycpv.replace(mycpv_cp, _unicode(newcp), 1)
+			mynewcpv = mycpv.replace(mycpv_cp, str(newcp), 1)
 			mynewcat = catsplit(newcp)[0]
 			origpath = self.getpath(mycpv)
 			if not os.path.exists(origpath):
@@ -762,7 +754,7 @@ class vardbapi(dbapi):
 				pkg_data = None
 			else:
 				cache_mtime, metadata = pkg_data
-				if not isinstance(cache_mtime, (float, long, int)) or \
+				if not isinstance(cache_mtime, (float, int)) or \
 					not isinstance(metadata, dict):
 					pkg_data = None
 
@@ -774,7 +766,7 @@ class vardbapi(dbapi):
 
 				# Handle truncated mtime in order to avoid cache
 				# invalidation for livecd squashfs (bug 564222).
-				elif long(cache_mtime) == mydir_stat.st_mtime:
+				elif int(cache_mtime) == mydir_stat.st_mtime:
 					cache_valid = True
 			else:
 				# Cache may contain integer mtime.
@@ -799,7 +791,7 @@ class vardbapi(dbapi):
 					cache_data.update(metadata)
 				for aux_key in cache_these:
 					cache_data[aux_key] = mydata[aux_key]
-				self._aux_cache["packages"][_unicode(mycpv)] = \
+				self._aux_cache["packages"][str(mycpv)] = \
 					(mydir_mtime, cache_data)
 				self._aux_cache["modified"].add(mycpv)
 
@@ -1105,7 +1097,7 @@ class vardbapi(dbapi):
 				mode='r', encoding=_encodings['repo.content'],
 				errors='replace') as f:
 				try:
-					counter = long(f.readline().strip())
+					counter = int(f.readline().strip())
 				except (OverflowError, ValueError) as e:
 					writemsg(_("!!! COUNTER file is corrupt: '%s'\n") %
 						self._counter_path, noiselevel=-1)
@@ -1264,7 +1256,7 @@ class vardbapi(dbapi):
 		if new_needed is not None:
 			f = atomic_ofstream(os.path.join(pkg.dbdir, LinkageMap._needed_aux_key))
 			for entry in new_needed:
-				f.write(_unicode(entry))
+				f.write(str(entry))
 			f.close()
 		f = atomic_ofstream(os.path.join(pkg.dbdir, "CONTENTS"))
 		write_contents(new_contents, root, f)
@@ -1336,7 +1328,7 @@ class vardbapi(dbapi):
 				counter = int(counter)
 			except ValueError:
 				counter = 0
-			return (_unicode(cpv), counter, mtime)
+			return (str(cpv), counter, mtime)
 
 	class _owners_db(object):
 
@@ -1465,7 +1457,7 @@ class vardbapi(dbapi):
 								len(hash_value) != 3:
 								continue
 							cpv, counter, mtime = hash_value
-							if not isinstance(cpv, basestring):
+							if not isinstance(cpv, str):
 								continue
 							try:
 								current_hash = hash_pkg(cpv)
@@ -3641,7 +3633,7 @@ class dblink(object):
 			symlink_collisions = []
 			destroot = self.settings['ROOT']
 			totfiles = len(file_list) + len(symlink_list)
-			previous = monotonic()
+			previous = time.monotonic()
 			progress_shown = False
 			report_interval = 1.7  # seconds
 			falign = len("%d" % totfiles)
@@ -3650,7 +3642,7 @@ class dblink(object):
 			for i, (f, f_type) in enumerate(chain(
 				((f, "reg") for f in file_list),
 				((f, "sym") for f in symlink_list))):
-				current = monotonic()
+				current = time.monotonic()
 				if current - previous > report_interval:
 					showMessage(_("%3d%% done,  %*d files remaining ...\n") %
 							(i * 100 / totfiles, falign, totfiles - i))
@@ -3916,7 +3908,7 @@ class dblink(object):
 			for phase, messages in logentries.items():
 				for key, lines in messages:
 					funcname = funcnames[key]
-					if isinstance(lines, basestring):
+					if isinstance(lines, str):
 						lines = [lines]
 					for line in lines:
 						for line in line.split('\n'):
@@ -4934,7 +4926,7 @@ class dblink(object):
 			self._installed_instance is not None
 
 		# this is supposed to merge a list of files.  There will be 2 forms of argument passing.
-		if isinstance(stufftomerge, basestring):
+		if isinstance(stufftomerge, str):
 			#A directory is specified.  Figure out protection paths, listdir() it and process it.
 			mergelist = [join(stufftomerge, child) for child in \
 				os.listdir(join(srcroot, stufftomerge))]
@@ -5473,7 +5465,7 @@ class dblink(object):
 
 	def setfile(self,fname,data):
 		kwargs = {}
-		if fname == 'environment.bz2' or not isinstance(data, basestring):
+		if fname == 'environment.bz2' or not isinstance(data, str):
 			kwargs['mode'] = 'wb'
 		else:
 			kwargs['mode'] = 'w'
@@ -5530,7 +5522,7 @@ class dblink(object):
 
 		build_time = backup_dblink.getfile('BUILD_TIME')
 		try:
-			build_time = long(build_time.strip())
+			build_time = int(build_time.strip())
 		except ValueError:
 			build_time = 0
 

@@ -1,7 +1,5 @@
-# Copyright 2004-2017 Gentoo Foundation
+# Copyright 2004-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
-
-from __future__ import unicode_literals
 
 __all__ = ['apply_permissions', 'apply_recursive_permissions',
 	'apply_secpass_permissions', 'apply_stat_permissions', 'atomic_ofstream',
@@ -49,10 +47,6 @@ from portage.localization import _
 from portage.proxy.objectproxy import ObjectProxy
 from portage.cache.mappings import UserDict
 
-if sys.hexversion >= 0x3000000:
-	_unicode = str
-else:
-	_unicode = unicode
 
 noiselimit = 0
 
@@ -505,7 +499,7 @@ def grabfile_package(myfilename, compatlevel=0, recursive=0,
 			writemsg(_("--- Invalid atom in %s: %s\n") % (source_file, e),
 				noiselevel=-1)
 		else:
-			if pkg_orig == _unicode(pkg):
+			if pkg_orig == str(pkg):
 				# normal atom, so return as Atom instance
 				if remember_source_file:
 					atoms.append((pkg, source_file))

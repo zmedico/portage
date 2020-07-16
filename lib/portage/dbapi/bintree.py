@@ -1,7 +1,5 @@
-# Copyright 1998-2019 Gentoo Authors
+# Copyright 1998-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
-
-from __future__ import unicode_literals
 
 __all__ = ["bindbapi", "binarytree"]
 
@@ -61,13 +59,6 @@ try:
 except ImportError:
 	from urlparse import urlparse
 
-if sys.hexversion >= 0x3000000:
-	# pylint: disable=W0622
-	_unicode = str
-	basestring = str
-	long = int
-else:
-	_unicode = unicode
 
 class UseCachedCopyOfRemoteIndex(Exception):
 	# If the local copy is recent enough
@@ -175,9 +166,9 @@ class bindbapi(fakedbapi):
 
 			def getitem(k):
 				if k == "_mtime_":
-					return _unicode(st[stat.ST_MTIME])
+					return str(st[stat.ST_MTIME])
 				elif k == "SIZE":
-					return _unicode(st.st_size)
+					return str(st.st_size)
 				if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
 					v = metadata_bytes.get(_unicode_encode(k,
 						encoding=_encodings['repo.content'],
@@ -509,7 +500,7 @@ class binarytree(object):
 		# sanity check
 		for atom in (origcp, newcp):
 			if not isjustname(atom):
-				raise InvalidPackageName(_unicode(atom))
+				raise InvalidPackageName(str(atom))
 		mynewcat = catsplit(newcp)[0]
 		origmatches=self.dbapi.cp_list(origcp)
 		moves = 0
@@ -533,7 +524,7 @@ class binarytree(object):
 			if not isvalidatom(newcp, eapi=mycpv.eapi):
 				continue
 
-			mynewcpv = mycpv.replace(mycpv_cp, _unicode(newcp), 1)
+			mynewcpv = mycpv.replace(mycpv_cp, str(newcp), 1)
 			myoldpkg = catsplit(mycpv)[1]
 			mynewpkg = catsplit(mynewcpv)[1]
 
@@ -799,12 +790,12 @@ class binarytree(object):
 						match = None
 						for d in possibilities:
 							try:
-								if long(d["_mtime_"]) != s[stat.ST_MTIME]:
+								if int(d["_mtime_"]) != s[stat.ST_MTIME]:
 									continue
 							except (KeyError, ValueError):
 								continue
 							try:
-								if long(d["SIZE"]) != long(s.st_size):
+								if int(d["SIZE"]) != int(s.st_size):
 									continue
 							except (KeyError, ValueError):
 								continue
@@ -908,7 +899,7 @@ class binarytree(object):
 
 					if pkg_metadata.get("BUILD_ID"):
 						try:
-							build_id = long(pkg_metadata["BUILD_ID"])
+							build_id = int(pkg_metadata["BUILD_ID"])
 						except ValueError:
 							writemsg(_("!!! Binary package has "
 								"invalid BUILD_ID: '%s'\n") %
@@ -938,8 +929,8 @@ class binarytree(object):
 							noiselevel=-1)
 						continue
 					if build_id is not None:
-						pkg_metadata["BUILD_ID"] = _unicode(build_id)
-					pkg_metadata["SIZE"] = _unicode(s.st_size)
+						pkg_metadata["BUILD_ID"] = str(build_id)
+					pkg_metadata["SIZE"] = str(s.st_size)
 					# Discard items used only for validation above.
 					pkg_metadata.pop("CATEGORY")
 					pkg_metadata.pop("PF")
@@ -953,13 +944,13 @@ class binarytree(object):
 						pkgindex._pkg_slot_dict())
 					if d:
 						try:
-							if long(d["_mtime_"]) != s[stat.ST_MTIME]:
+							if int(d["_mtime_"]) != s[stat.ST_MTIME]:
 								d.clear()
 						except (KeyError, ValueError):
 							d.clear()
 					if d:
 						try:
-							if long(d["SIZE"]) != long(s.st_size):
+							if int(d["SIZE"]) != int(s.st_size):
 								d.clear()
 						except (KeyError, ValueError):
 							d.clear()
@@ -1186,12 +1177,12 @@ class binarytree(object):
 				writemsg(_("\n\n!!! Error fetching binhost package" \
 					" info from '%s'\n") % _hide_url_passwd(base_url))
 				# With Python 2, the EnvironmentError message may
-				# contain bytes or unicode, so use _unicode to ensure
+				# contain bytes or unicode, so use str to ensure
 				# safety with all locales (bug #532784).
 				try:
-					error_msg = _unicode(e)
+					error_msg = str(e)
 				except UnicodeDecodeError as uerror:
-					error_msg = _unicode(uerror.object,
+					error_msg = str(uerror.object,
 						encoding='utf_8', errors='replace')
 				writemsg("!!! %s\n\n" % error_msg)
 				del e
@@ -1335,7 +1326,7 @@ class binarytree(object):
 				# attributes, so that we can later distinguish that it
 				# is identical to its remote counterpart.
 				build_id = self._parse_build_id(basename)
-				metadata["BUILD_ID"] = _unicode(build_id)
+				metadata["BUILD_ID"] = str(build_id)
 				cpv = _pkg_str(cpv, metadata=metadata,
 					settings=self.settings, db=self.dbapi)
 				if basename.endswith(".xpak"):
@@ -1417,9 +1408,9 @@ class binarytree(object):
 
 		for k in keys:
 			if k == "_mtime_":
-				metadata[k] = _unicode(st[stat.ST_MTIME])
+				metadata[k] = str(st[stat.ST_MTIME])
 			elif k == "SIZE":
-				metadata[k] = _unicode(st.st_size)
+				metadata[k] = str(st.st_size)
 			else:
 				if decode_metadata_name:
 					v = binpkg_metadata.get(_unicode_encode(k))
@@ -1481,7 +1472,7 @@ class binarytree(object):
 		contents = codecs.getwriter(_encodings['repo.content'])(io.BytesIO())
 		pkgindex.write(contents)
 		contents = contents.getvalue()
-		atime = mtime = long(pkgindex.header["TIMESTAMP"])
+		atime = mtime = int(pkgindex.header["TIMESTAMP"])
 		output_files = [(atomic_ofstream(self._pkgindex_file, mode="wb"),
 			self._pkgindex_file, None)]
 
@@ -1517,8 +1508,8 @@ class binarytree(object):
 
 		d["CPV"] = cpv
 		st = os.lstat(pkg_path)
-		d["_mtime_"] = _unicode(st[stat.ST_MTIME])
-		d["SIZE"] = _unicode(st.st_size)
+		d["_mtime_"] = str(st[stat.ST_MTIME])
+		d["SIZE"] = str(st.st_size)
 		d["BINPKG_FORMAT"] = binpkg_format
 
 		rel_path = pkg_path[len(self.pkgdir)+1:]
@@ -1604,7 +1595,7 @@ class binarytree(object):
 		"""
 		if not (self.settings.profile_path and
 			"IUSE_IMPLICIT" in self.settings):
-			header.setdefault("VERSION", _unicode(self._pkgindex_version))
+			header.setdefault("VERSION", str(self._pkgindex_version))
 			return
 
 		portdir = normalize_path(os.path.realpath(self.settings["PORTDIR"]))
@@ -1615,7 +1606,7 @@ class binarytree(object):
 			if profile_path.startswith(profiles_base):
 				profile_path = profile_path[len(profiles_base):]
 			header["PROFILE"] = profile_path
-		header["VERSION"] = _unicode(self._pkgindex_version)
+		header["VERSION"] = str(self._pkgindex_version)
 		base_uri = self.settings.get("PORTAGE_BINHOST_HEADER_URI")
 		if base_uri:
 			header["URI"] = base_uri

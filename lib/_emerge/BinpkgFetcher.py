@@ -1,4 +1,4 @@
-# Copyright 1999-2018 Gentoo Foundation
+# Copyright 1999-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 import functools
@@ -19,9 +19,6 @@ from portage.const import (SUPPORTED_XPAK_EXTENSIONS,
 from portage.exception import FileNotFound, InvalidBinaryPackageFormat
 from portage.util._async.AsyncTaskFuture import AsyncTaskFuture
 from portage.util._pty import _create_pty_or_pipe
-
-if sys.hexversion >= 0x3000000:
-	long = int
 
 
 class BinpkgFetcher(CompositeTask):
@@ -181,6 +178,7 @@ class _BinpkgFetcherProcess(SpawnProcess):
 		self.env = fetch_env
 		if settings.selinux_enabled():
 			self._selinux_type = settings["PORTAGE_FETCH_T"]
+		self.log_filter_file = settings.get('PORTAGE_LOG_FILTER_FILE_CMD')
 		SpawnProcess._start(self)
 
 	def _pipe(self, fd_pipes):
@@ -207,7 +205,7 @@ class _BinpkgFetcherProcess(SpawnProcess):
 					self.pkg.cpv)].get("_mtime_")
 				if remote_mtime is not None:
 					try:
-						remote_mtime = long(remote_mtime)
+						remote_mtime = int(remote_mtime)
 					except ValueError:
 						pass
 					else:

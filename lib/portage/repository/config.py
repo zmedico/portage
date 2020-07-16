@@ -1,8 +1,6 @@
 # Copyright 2010-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-from __future__ import unicode_literals
-
 import io
 import logging
 import warnings
@@ -28,9 +26,6 @@ from portage import _encodings
 from portage import manifest
 import portage.sync
 
-if sys.hexversion >= 0x3000000:
-	# pylint: disable=W0622
-	basestring = str
 
 # Characters prohibited by repoman's file.name check.
 _invalid_path_char_re = re.compile(r'[^a-zA-Z0-9._\-+/]')
@@ -220,10 +215,10 @@ class RepoConfig(object):
 		self.sync_depth = repo_opts.get('sync-depth')
 
 		self.sync_hooks_only_on_change = repo_opts.get(
-			'sync-hooks-only-on-change', 'false').lower() == 'true'
+			'sync-hooks-only-on-change', 'false').lower() in ('true', 'yes')
 
 		self.strict_misc_digests = repo_opts.get(
-			'strict-misc-digests', 'true').lower() == 'true'
+			'strict-misc-digests', 'true').lower() in ('true', 'yes')
 
 		self.sync_allow_hardlinks = repo_opts.get(
 			'sync-allow-hardlinks', 'true').lower() in ('true', 'yes')
@@ -671,7 +666,7 @@ class RepoConfigLoader(object):
 
 		recursive_paths = []
 		for p in paths:
-			if isinstance(p, basestring):
+			if isinstance(p, str):
 				recursive_paths.extend(_recursive_file_list(p))
 			else:
 				recursive_paths.append(p)

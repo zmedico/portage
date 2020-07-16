@@ -2,8 +2,6 @@
 # Copyright 2003-2018 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
-from __future__ import unicode_literals
-
 __all__ = [
 	'Atom', 'best_match_to_list', 'cpvequal',
 	'dep_getcpv', 'dep_getkey', 'dep_getslot',
@@ -17,6 +15,7 @@ __all__ = [
 
 import re, sys
 import warnings
+from functools import lru_cache
 
 import portage
 portage.proxy.lazyimport.lazyimport(globals(),
@@ -31,12 +30,6 @@ from portage.versions import _cp, _cpv, _pkg_str, _slot, _unknown_repo, _vr, \
 	catpkgsplit, vercmp, ververify
 import portage.cache.mappings
 
-if sys.hexversion >= 0x3000000:
-	# pylint: disable=W0622
-	basestring = str
-	_unicode = str
-else:
-	_unicode = unicode
 
 # \w is [a-zA-Z0-9_]
 
@@ -353,7 +346,7 @@ class paren_normalize(list):
 			return dest
 		i = iter(src)
 		for x in i:
-			if isinstance(x, basestring):
+			if isinstance(x, str):
 				if x in ('||', '^^'):
 					y = self._zap_parens(next(i), [], disjunction=True)
 					if len(y) == 1:
@@ -404,49 +397,10 @@ def paren_enclose(mylist, unevaluated_atom=False, opconvert=False):
 			mystrparts.append(x)
 	return " ".join(mystrparts)
 
-def use_reduce(depstr, uselist=(), masklist=(), matchall=False, excludeall=(), is_src_uri=False, \
-	eapi=None, opconvert=False, flat=False, is_valid_flag=None, token_class=None, matchnone=False,
-	subset=None):
-	"""
-	Takes a dep string and reduces the use? conditionals out, leaving an array
-	with subarrays. All redundant brackets are removed.
-
-	@param depstr: depstring
-	@type depstr: String
-	@param uselist: Sequence of use enabled flags
-	@type uselist: Sequence
-	@param masklist: Sequence of masked flags (always treated as disabled)
-	@type masklist: Sequence
-	@param matchall: Treat all conditionals as active. Used by repoman. 
-	@type matchall: Bool
-	@param excludeall: Sequence of flags for which negated conditionals are always treated as inactive.
-	@type excludeall: Sequence
-	@param is_src_uri: Indicates if depstr represents a SRC_URI
-	@type is_src_uri: Bool
-	@param eapi: Indicates the EAPI the dep string has to comply to
-	@type eapi: String
-	@param opconvert: Put every operator as first element into it's argument list
-	@type opconvert: Bool
-	@param flat: Create a flat list of all tokens
-	@type flat: Bool
-	@param is_valid_flag: Function that decides if a given use flag might be used in use conditionals
-	@type is_valid_flag: Function
-	@param token_class: Convert all non operator tokens into this class
-	@type token_class: Class
-	@param matchnone: Treat all conditionals as inactive. Used by digestgen(). 
-	@type matchnone: Bool
-	@param subset: Select a subset of dependencies conditional on the given flags
-	@type subset: Sequence
-	@rtype: List
-	@return: The use reduced depend array
-	"""
-	if isinstance(depstr, list):
-		if portage._internal_caller:
-			warnings.warn(_("Passing paren_reduced dep arrays to %s is deprecated. " + \
-				"Pass the original dep string instead.") % \
-				('portage.dep.use_reduce',), DeprecationWarning, stacklevel=2)
-		depstr = paren_enclose(depstr)
-
+@lru_cache(1024)
+def _use_reduce_cached(depstr, uselist, masklist, matchall, excludeall, \
+	is_src_uri,  eapi, opconvert, flat, is_valid_flag, token_class, \
+	matchnone,subset):
 	if opconvert and flat:
 		raise ValueError("portage.dep.use_reduce: 'opconvert' and 'flat' are mutually exclusive")
 
@@ -597,13 +551,12 @@ def use_reduce(depstr, uselist=(), masklist=(), matchall=False, excludeall=(), i
 						stack[level].extend(l)
 					continue
 
-				if stack[level] and isinstance(stack[level][-1],
-					basestring):
+				if stack[level] and isinstance(stack[level][-1], str):
 					if stack[level][-1] == "||" and not l:
 						#Optimize: || ( ) -> .
 						if not eapi_attrs.empty_groups_always_true:
 							# in EAPI 7+, we need to fail here
-							l.append((token_class or _unicode)("__const__/empty-any-of"))
+							l.append((token_class or str)("__const__/empty-any-of"))
 						stack[level].pop()
 					elif stack[level][-1][-1] == "?":
 						#The last token before the '(' that matches the current ')'
@@ -626,8 +579,7 @@ def use_reduce(depstr, uselist=(), masklist=(), matchall=False, excludeall=(), i
 					#ends in a non-operator. This is almost equivalent to stack[level][-1]=="||",
 					#expect that it skips empty levels.
 					while k>=0:
-						if stack[k] and isinstance(stack[k][-1],
-							basestring):
+						if stack[k] and isinstance(stack[k][-1], str):
 							if stack[k][-1] == "||":
 								return k
 							elif stack[k][-1][-1] != "?":
@@ -768,6 +720,65 @@ def use_reduce(depstr, uselist=(), masklist=(), matchall=False, excludeall=(), i
 			_("Missing file name at end of string"))
 
 	return stack[0]
+
+def use_reduce(depstr, uselist=(), masklist=(), matchall=False, excludeall=(), is_src_uri=False, \
+	eapi=None, opconvert=False, flat=False, is_valid_flag=None, token_class=None, matchnone=False,
+	subset=None):
+	"""
+	Takes a dep string and reduces the use? conditionals out, leaving an array
+	with subarrays. All redundant brackets are removed.
+
+	@param depstr: depstring
+	@type depstr: String
+	@param uselist: Sequence of use enabled flags
+	@type uselist: Sequence
+	@param masklist: Sequence of masked flags (always treated as disabled)
+	@type masklist: Sequence
+	@param matchall: Treat all conditionals as active. Used by repoman.
+	@type matchall: Bool
+	@param excludeall: Sequence of flags for which negated conditionals are always treated as inactive.
+	@type excludeall: Sequence
+	@param is_src_uri: Indicates if depstr represents a SRC_URI
+	@type is_src_uri: Bool
+	@param eapi: Indicates the EAPI the dep string has to comply to
+	@type eapi: String
+	@param opconvert: Put every operator as first element into it's argument list
+	@type opconvert: Bool
+	@param flat: Create a flat list of all tokens
+	@type flat: Bool
+	@param is_valid_flag: Function that decides if a given use flag might be used in use conditionals
+	@type is_valid_flag: Function
+	@param token_class: Convert all non operator tokens into this class
+	@type token_class: Class
+	@param matchnone: Treat all conditionals as inactive. Used by digestgen().
+	@type matchnone: Bool
+	@param subset: Select a subset of dependencies conditional on the given flags
+	@type subset: Sequence
+	@rtype: List
+	@return: The use reduced depend array
+	"""
+	if isinstance(depstr, list):
+		if portage._internal_caller:
+			warnings.warn(_("Passing paren_reduced dep arrays to %s is deprecated. " + \
+				"Pass the original dep string instead.") % \
+				('portage.dep.use_reduce',), DeprecationWarning, stacklevel=2)
+		depstr = paren_enclose(depstr)
+
+	if uselist is not None:
+		uselist = frozenset(uselist)
+	if masklist is not None:
+		masklist = frozenset(masklist)
+	if excludeall is not None:
+		excludeall = frozenset(excludeall)
+	if subset is not None:
+		subset = frozenset(subset)
+
+	result = _use_reduce_cached(depstr, uselist, masklist, matchall, \
+		excludeall, is_src_uri, eapi, opconvert, flat, is_valid_flag, \
+		token_class, matchnone, subset)
+
+	# The list returned by this function may be modified, so return a copy.
+	return result[:]
 
 def dep_opconvert(deplist):
 	"""
@@ -1209,7 +1220,7 @@ class _use_dep(object):
 		return _use_dep(tokens, self._eapi_attrs, enabled_flags=enabled_flags, disabled_flags=disabled_flags,
 			missing_enabled=missing_enabled, missing_disabled=missing_disabled, required=self.required)
 
-class Atom(_unicode):
+class Atom(str):
 
 	"""
 	For compatibility with existing atom string manipulation code, this
@@ -1236,7 +1247,7 @@ class Atom(_unicode):
 
 	def __new__(cls, s, unevaluated_atom=None, allow_wildcard=False, allow_repo=None,
 		_use=None, eapi=None, is_valid_flag=None, allow_build_id=None):
-		return _unicode.__new__(cls, s)
+		return str.__new__(cls, s)
 
 	def __init__(self, s, unevaluated_atom=None, allow_wildcard=False, allow_repo=None,
 		_use=None, eapi=None, is_valid_flag=None, allow_build_id=None):
@@ -1244,13 +1255,13 @@ class Atom(_unicode):
 			# This is an efficiency assertion, to ensure that the Atom
 			# constructor is not called redundantly.
 			raise TypeError(_("Expected %s, got %s") % \
-				(_unicode, type(s)))
+				(str, type(s)))
 
-		if not isinstance(s, _unicode):
-			# Avoid TypeError from _unicode.__init__ with PyPy.
+		if not isinstance(s, str):
+			# Avoid TypeError from str.__init__ with PyPy.
 			s = _unicode_decode(s)
 
-		_unicode.__init__(s)
+		str.__init__(s)
 
 		eapi_attrs = _get_eapi_attrs(eapi)
 		atom_re = _get_atom_re(eapi_attrs)
@@ -1417,7 +1428,7 @@ class Atom(_unicode):
 				unevaluated_atom.use is not None:
 				# unevaluated_atom.use is used for IUSE checks when matching
 				# packages, so it must not propagate to without_use
-				without_use = Atom(_unicode(self),
+				without_use = Atom(str(self),
 					allow_wildcard=allow_wildcard,
 					allow_repo=allow_repo,
 					eapi=eapi)
@@ -1433,9 +1444,9 @@ class Atom(_unicode):
 			self.__dict__['unevaluated_atom'] = self
 
 		if eapi is not None:
-			if not isinstance(eapi, basestring):
+			if not isinstance(eapi, str):
 				raise TypeError('expected eapi argument of ' + \
-					'%s, got %s: %s' % (basestring, type(eapi), eapi,))
+					'%s, got %s: %s' % (str, type(eapi), eapi,))
 			if self.slot and not eapi_attrs.slot_deps:
 				raise InvalidAtom(
 					_("Slot deps are not allowed in EAPI %s: '%s'") \
@@ -1497,7 +1508,7 @@ class Atom(_unicode):
 		if self.repo is not None:
 			atom += _repo_separator + self.repo
 		if self.use is not None:
-			atom += _unicode(self.use)
+			atom += str(self.use)
 		return Atom(atom,
 			allow_repo=True, allow_wildcard=True)
 
@@ -1513,7 +1524,7 @@ class Atom(_unicode):
 				atom += self.slot_operator
 		atom += _repo_separator + repo
 		if self.use is not None:
-			atom += _unicode(self.use)
+			atom += str(self.use)
 		return Atom(atom, allow_repo=True, allow_wildcard=True)
 
 	def with_slot(self, slot):
@@ -1521,7 +1532,7 @@ class Atom(_unicode):
 		if self.repo is not None:
 			atom += _repo_separator + self.repo
 		if self.use is not None:
-			atom += _unicode(self.use)
+			atom += str(self.use)
 		return Atom(atom, allow_repo=True, allow_wildcard=True)
 
 	def __setattr__(self, name, value):
@@ -1579,7 +1590,7 @@ class Atom(_unicode):
 			if self.slot_operator is not None:
 				atom += self.slot_operator
 		use_dep = self.use.evaluate_conditionals(use)
-		atom += _unicode(use_dep)
+		atom += str(use_dep)
 		return Atom(atom, unevaluated_atom=self, allow_repo=(self.repo is not None), _use=use_dep)
 
 	def violated_conditionals(self, other_use, is_valid_flag, parent_use=None):
@@ -1607,7 +1618,7 @@ class Atom(_unicode):
 			if self.slot_operator is not None:
 				atom += self.slot_operator
 		use_dep = self.use.violated_conditionals(other_use, is_valid_flag, parent_use)
-		atom += _unicode(use_dep)
+		atom += str(use_dep)
 		return Atom(atom, unevaluated_atom=self, allow_repo=(self.repo is not None), _use=use_dep)
 
 	def _eval_qa_conditionals(self, use_mask, use_force):
@@ -1623,7 +1634,7 @@ class Atom(_unicode):
 			if self.slot_operator is not None:
 				atom += self.slot_operator
 		use_dep = self.use._eval_qa_conditionals(use_mask, use_force)
-		atom += _unicode(use_dep)
+		atom += str(use_dep)
 		return Atom(atom, unevaluated_atom=self, allow_repo=(self.repo is not None), _use=use_dep)
 
 	def __copy__(self):
@@ -1719,7 +1730,7 @@ class ExtendedAtomDict(portage.cache.mappings.MutableMapping):
 
 	def __getitem__(self, cp):
 
-		if not isinstance(cp, basestring):
+		if not isinstance(cp, str):
 			raise KeyError(cp)
 
 		if '*' in cp:
@@ -1961,7 +1972,7 @@ def isvalidatom(atom, allow_blockers=False, allow_wildcard=False,
 
 	if eapi is not None and isinstance(atom, Atom) and atom.eapi != eapi:
 		# We'll construct a new atom with the given eapi.
-		atom = _unicode(atom)
+		atom = str(atom)
 
 	try:
 		if not isinstance(atom, Atom):
