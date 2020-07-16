@@ -1,13 +1,15 @@
 # Copyright 2011-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
+from __future__ import print_function
 import subprocess
 import sys
 
 import portage
 from portage import shutil, os
 from portage import _unicode_decode
-from portage.const import (BASH_BINARY, PORTAGE_PYM_PATH, USER_CONFIG_PATH)
+from portage.const import (BASH_BINARY, PORTAGE_PYM_PATH, USER_CONFIG_PATH,
+	SUPPORTED_GENTOO_BINPKG_FORMATS)
 from portage.cache.mappings import Mapping
 from portage.process import find_binary
 from portage.tests import TestCase
@@ -17,6 +19,7 @@ from portage.util import (ensure_dirs, find_updated_config_files,
 	shlex_split)
 from portage.util.futures import asyncio
 from portage.util.futures.compat_coroutine import coroutine
+from portage.output import colorize
 
 
 class BinhostContentMap(Mapping):
@@ -220,12 +223,23 @@ call_has_and_best_version() {
 			),
 		)
 
-		playground = ResolverPlayground(
-			ebuilds=ebuilds, installed=installed, debug=debug)
+		for binpkg_format in SUPPORTED_GENTOO_BINPKG_FORMATS:
+			with self.subTest(binpkg_format=binpkg_format):
+				print(colorize("HILITE", binpkg_format), end=" ... ")
+				sys.stdout.flush()
+				playground = ResolverPlayground(
+					ebuilds=ebuilds, installed=installed, debug=debug,
+					user_config={
+						"make.conf":
+						(
+							'BINPKG_FORMAT="%s"' % binpkg_format,
+						),
+					})
 
-		loop = asyncio._wrap_loop()
-		loop.run_until_complete(asyncio.ensure_future(
-			self._async_test_simple(loop, playground, metadata_xml_files), loop=loop))
+				loop = asyncio._wrap_loop()
+				loop.run_until_complete(asyncio.ensure_future(
+					self._async_test_simple(loop, playground,
+						metadata_xml_files), loop=loop))
 
 	@coroutine
 	def _async_test_simple(self, loop, playground, metadata_xml_files):
