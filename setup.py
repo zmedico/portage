@@ -15,7 +15,7 @@ from distutils.command.install_lib import install_lib
 from distutils.command.install_scripts import install_scripts
 from distutils.command.sdist import sdist
 from distutils.dep_util import newer
-from distutils.dir_util import mkpath, remove_tree
+from distutils.dir_util import mkpath, remove_tree, copy_tree
 from distutils.util import change_root, subst_vars
 
 import codecs
@@ -600,6 +600,16 @@ class test(Command):
 
 	def run(self):
 		self.run_command('build_tests')
+
+		# copy GPG test keys
+		copy_tree(
+			os.path.join(self.build_lib, "..", "..", "lib", "portage",
+				"tests", ".gnupg"),
+			os.path.join(self.build_lib, "portage", "tests", ".gnupg")
+		)
+		os.chmod(os.path.join(self.build_lib, "portage", "tests", ".gnupg"),
+			0o700)
+
 		subprocess.check_call([
 			sys.executable, '-bWd',
 			os.path.join(self.build_lib, 'portage/tests/runTests.py')

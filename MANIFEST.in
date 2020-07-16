@@ -20,3 +20,6 @@ include .portage_not_installed
 
 # extra scripts
 include misc/*
+
+# GPG test keys
+recursive-include lib/portage/tests/.gnupg *
