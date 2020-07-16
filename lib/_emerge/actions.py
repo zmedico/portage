@@ -40,9 +40,9 @@ from portage.dbapi._expand_new_virt import expand_new_virt
 from portage.dbapi.IndexedPortdb import IndexedPortdb
 from portage.dbapi.IndexedVardb import IndexedVardb
 from portage.dep import Atom, _repo_separator, _slot_separator
-from portage.exception import InvalidAtom, InvalidData, ParseError
-from portage.output import colorize, create_color_func, darkgreen, \
-	red, xtermTitle, xtermTitleReset
+from portage.exception import InvalidAtom, InvalidData, ParseError, GPGException
+from portage.output import blue, colorize, create_color_func, darkgreen, \
+	red, xtermTitle, xtermTitleReset, yellow
 good = create_color_func("GOOD")
 bad = create_color_func("BAD")
 warn = create_color_func("WARN")
@@ -62,6 +62,7 @@ from portage.sync.old_tree_timestamp import old_tree_timestamp_warn
 from portage.localization import _
 from portage.metadata import action_metadata
 from portage.emaint.main import print_results
+from portage.gpg import GPG
 
 from _emerge.clear_caches import clear_caches
 from _emerge.create_depgraph_params import create_depgraph_params
@@ -519,6 +520,22 @@ def action_build(emerge_config, trees=DeprecationWarning,
 					writemsg_level("!!! %s\n" %
 						_("Read-only file system: %s") %
 						trees[eroot]["bintree"].pkgdir,
+						level=logging.ERROR, noiselevel=-1)
+					return 1
+
+		# unlock GPG if needed
+		if need_write_bindb:
+			if ("binpkg-signing" in trees[eroot]["root_config"].
+				settings.features) and (
+				"BINPKG_GPG_UNLOCK_COMMAND" in trees[eroot]["root_config"].
+				settings):
+				portage.writemsg_stdout(">>> Unlocking GPG... ")
+				sys.stdout.flush()
+				gpg = GPG(trees[eroot]["root_config"].settings)
+				try:
+					gpg.unlock()
+				except GPGException as e:
+					writemsg_level(colorize("BAD", "!!! %s\n" % e),
 						level=logging.ERROR, noiselevel=-1)
 					return 1
 

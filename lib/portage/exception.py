@@ -178,6 +178,9 @@ class UnsupportedAPIException(PortagePackageException):
 			encoding=_encodings['content'], errors='replace')
 
 
+class GPGException(PortageException):
+	"""GPG operation failed"""
+
 class SignatureException(PortageException):
 	"""Signature was not present in the checked file"""
 
