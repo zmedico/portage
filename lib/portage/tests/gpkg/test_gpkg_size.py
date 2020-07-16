@@ -28,33 +28,36 @@ class test_gpkg_large_size_case(TestCase):
 				),
 			}
 		)
-		settings = playground.settings
-
 		tmpdir = tempfile.mkdtemp()
-		orig_full_path = os.path.join(tmpdir, 'orig/')
-		os.makedirs(orig_full_path)
-		# Check if filesystem support sparse file
-		with open(os.path.join(orig_full_path, 'test'), 'wb') as test_file:
-			test_file.truncate(1048576)
 
-		if os.stat(os.path.join(orig_full_path, 'test')).st_blocks != 0:
-			self.skipTest("Filesystem does not support sparse file")
+		try:
+			settings = playground.settings
 
-		with open(os.path.join(orig_full_path, 'test'), 'wb') as test_file:
-			test_file.truncate(10737418240)
+			orig_full_path = os.path.join(tmpdir, 'orig/')
+			os.makedirs(orig_full_path)
+			# Check if filesystem support sparse file
+			with open(os.path.join(orig_full_path, 'test'), 'wb') as test_file:
+				test_file.truncate(1048576)
 
-		gpkg_file_loc = os.path.join(tmpdir, 'test.gpkg.tar')
-		test_gpkg = gpkg(settings, 'test', gpkg_file_loc)
+			if os.stat(os.path.join(orig_full_path, 'test')).st_blocks != 0:
+				self.skipTest("Filesystem does not support sparse file")
 
-		check_result = test_gpkg._check_pre_image_files(
-			os.path.join(tmpdir, 'orig'))
-		self.assertEqual(check_result, (4, 10737418240, 10737418240))
+			with open(os.path.join(orig_full_path, 'test'), 'wb') as test_file:
+				test_file.truncate(10737418240)
 
-		test_gpkg.compress(os.path.join(tmpdir, 'orig'), {'meta': 'test'})
+			gpkg_file_loc = os.path.join(tmpdir, 'test.gpkg.tar')
+			test_gpkg = gpkg(settings, 'test', gpkg_file_loc)
 
-		with open(gpkg_file_loc, 'rb') as container:
-			# container
-			self.assertEqual(test_gpkg._get_tar_format(container),
-				tarfile.GNU_FORMAT)
+			check_result = test_gpkg._check_pre_image_files(
+				os.path.join(tmpdir, 'orig'))
+			self.assertEqual(check_result, (4, 10737418240, 10737418240))
 
-		shutil.rmtree(tmpdir)
+			test_gpkg.compress(os.path.join(tmpdir, 'orig'), {'meta': 'test'})
+
+			with open(gpkg_file_loc, 'rb') as container:
+				# container
+				self.assertEqual(test_gpkg._get_tar_format(container),
+					tarfile.GNU_FORMAT)
+		finally:
+			shutil.rmtree(tmpdir)
+			playground.cleanup()

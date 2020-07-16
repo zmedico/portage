@@ -72,35 +72,40 @@ class test_gpkg_stream_case(TestCase):
 			self.skipTest("Not support Python 2")
 		
 		tmpdir = tempfile.mkdtemp()
-		gpkg_file_loc = os.path.join(tmpdir, 'test.gpkg.tar')
-		data = urandom(1048576)
-		with tarfile.open(gpkg_file_loc, "w") as test_tar:
-			test_tarinfo = tarfile.TarInfo("test")
-			with portage.gpkg.tar_stream_writer(test_tarinfo, test_tar,
-				tarfile.USTAR_FORMAT, ["cat"]) as test_writer:
-				test_writer.write(data)
+		try:
+			gpkg_file_loc = os.path.join(tmpdir, 'test.gpkg.tar')
+			data = urandom(1048576)
+			with tarfile.open(gpkg_file_loc, "w") as test_tar:
+				test_tarinfo = tarfile.TarInfo("test")
+				with portage.gpkg.tar_stream_writer(test_tarinfo, test_tar,
+					tarfile.USTAR_FORMAT, ["cat"]) as test_writer:
+					test_writer.write(data)
 
-		with tarfile.open(gpkg_file_loc, "r") as test_tar:
-			test_tarinfo = test_tar.getmember("test")
-			data2 = test_tar.extractfile(test_tarinfo).read()
-			self.assertEqual(data, data2)
-		shutil.rmtree(tmpdir)
+			with tarfile.open(gpkg_file_loc, "r") as test_tar:
+				test_tarinfo = test_tar.getmember("test")
+				data2 = test_tar.extractfile(test_tarinfo).read()
+				self.assertEqual(data, data2)
+		finally:
+			shutil.rmtree(tmpdir)
 
 	def test_gpkg_stream_writer_without_cmd(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
 		
 		tmpdir = tempfile.mkdtemp()
-		gpkg_file_loc = os.path.join(tmpdir, 'test.gpkg.tar')
-		data = urandom(1048576)
-		with tarfile.open(gpkg_file_loc, "w") as test_tar:
-			test_tarinfo = tarfile.TarInfo("test")
-			with portage.gpkg.tar_stream_writer(test_tarinfo, test_tar,
-				tarfile.USTAR_FORMAT) as test_writer:
-				test_writer.write(data)
 
-		with tarfile.open(gpkg_file_loc, "r") as test_tar:
-			test_tarinfo = test_tar.getmember("test")
-			data2 = test_tar.extractfile(test_tarinfo).read()
-			self.assertEqual(data, data2)
-		shutil.rmtree(tmpdir)
+		try:
+			gpkg_file_loc = os.path.join(tmpdir, 'test.gpkg.tar')
+			data = urandom(1048576)
+			with tarfile.open(gpkg_file_loc, "w") as test_tar:
+				test_tarinfo = tarfile.TarInfo("test")
+				with portage.gpkg.tar_stream_writer(test_tarinfo, test_tar,
+					tarfile.USTAR_FORMAT) as test_writer:
+					test_writer.write(data)
+
+			with tarfile.open(gpkg_file_loc, "r") as test_tar:
+				test_tarinfo = test_tar.getmember("test")
+				data2 = test_tar.extractfile(test_tarinfo).read()
+				self.assertEqual(data, data2)
+		finally:
+			shutil.rmtree(tmpdir)
