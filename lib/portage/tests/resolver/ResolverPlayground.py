@@ -21,6 +21,7 @@ from portage.tests import cnf_path
 from portage.util import ensure_dirs, normalize_path
 from portage.versions import catsplit
 from portage.exception import InvalidBinaryPackageFormat
+from portage.gpg import GPG
 
 import _emerge
 from _emerge.actions import _calc_depclean
@@ -273,6 +274,9 @@ class ResolverPlayground(object):
 		items = getattr(binpkgs, 'items', None)
 		items = items() if items is not None else binpkgs
 		binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+		if binpkg_format == "gpkg":
+			gpg = GPG(self.settings)
+			gpg.unlock()
 		for cpv, metadata in items:
 			a = Atom("=" + cpv, allow_repo=True)
 			repo = a.repo
@@ -476,11 +480,33 @@ class ResolverPlayground(object):
 				#Create profile symlink
 				os.symlink(sub_profile_dir, os.path.join(user_config_dir, "make.profile"))
 
+		gpg_test_path = os.path.join(
+			os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
+			".gnupg")
+			
 		make_conf = {
 			"ACCEPT_KEYWORDS": "x86",
+			"BINPKG_GPG_UNLOCK_COMMAND": 
+				'/usr/bin/gpg --detach-sig --armor --batch --no-tty --yes '
+				'--digest-algo SHA256 --homedir "%s" '
+				'--pinentry-mode loopback --passphrase "GentooTest" '
+				'--local-user 5D90EA06352177F6 --output /dev/null /dev/null'
+				% gpg_test_path,
+			"BINPKG_GPG_SIGNING_COMMAND": 
+				'/usr/bin/gpg --detach-sig --armor --batch --no-tty --yes '
+				'--digest-algo SHA256 --homedir "%s" '
+				'--local-user 5D90EA06352177F6'
+				% gpg_test_path,
+			"BINPKG_GPG_VERIFY_COMMAND": 
+				'/usr/bin/gpg --verify --batch --no-tty --yes --status-fd 1 '
+				'--homedir "%s" "\\\\${SIGN_FILE}" -'
+				% gpg_test_path,
 			"CLEAN_DELAY": "0",
 			"DISTDIR" : self.distdir,
 			"EMERGE_WARNING_DELAY": "0",
+			"FEATURES": 
+				'${FEATURES} binpkg-signing binpkg-request-signature '
+				'gpg-keepalive',
 			"PKGDIR": self.pkgdir,
 			"PORTAGE_INST_GID": str(portage.data.portage_gid),
 			"PORTAGE_INST_UID": str(portage.data.portage_uid),
