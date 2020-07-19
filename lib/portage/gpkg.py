@@ -122,8 +122,8 @@ class tar_stream_writer(object):
 		"""
 		if self.proc is not None:
 			self.killed = True
-			self.proc.stdin.close()
 			self.proc.kill()
+			self.proc.stdin.close()
 			self.close()
 
 	def _cmd_read_thread(self):
@@ -301,8 +301,8 @@ class tar_stream_reader(object):
 		"""
 		if self.proc is not None:
 			self.killed = True
-			self.proc.stdin.close()
 			self.proc.kill()
+			self.proc.stdin.close()
 			self.close()
 
 	def read(self, bufsize=-1):
