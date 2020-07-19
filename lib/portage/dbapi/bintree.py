@@ -154,9 +154,11 @@ class bindbapi(fakedbapi):
 				raise KeyError(mycpv)
 			if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
 				metadata_bytes = portage.xpak.tbz2(binpkg_path).get_data()
+				decode_metadata_name = False
 			elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
 				metadata_bytes = portage.gpkg.gpkg(self.settings, mycpv,
 					binpkg_path).get_metadata()
+				decode_metadata_name = True
 			else:
 				raise InvalidBinaryPackageFormat(
 					"Unknown binary package format %s" % binpkg_path)
@@ -166,12 +168,13 @@ class bindbapi(fakedbapi):
 					return str(st[stat.ST_MTIME])
 				if k == "SIZE":
 					return str(st.st_size)
-				if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
-					v = metadata_bytes.get(_unicode_encode(k,
-						encoding=_encodings['repo.content'],
-						errors='backslashreplace'))
-				elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
-					v = metadata_bytes.get(k)
+				else:
+					if decode_metadata_name:
+						v = metadata_bytes.get(k)
+					else:
+						v = metadata_bytes.get(_unicode_encode(k,
+							encoding=_encodings['repo.content'],
+							errors='backslashreplace'))
 				if v is not None:
 					v = _unicode_decode(v,
 						encoding=_encodings['repo.content'], errors='replace')
@@ -180,6 +183,7 @@ class bindbapi(fakedbapi):
 			getitem = self.cpvdict[instance_key].get
 		mydata = {}
 		mykeys = wants
+
 		for x in mykeys:
 			myval = getitem(x)
 			# myval is None if the key doesn't exist
@@ -544,26 +548,28 @@ class binarytree:
 			if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
 				mytbz2 = portage.xpak.tbz2(binpkg_path)
 				mydata = mytbz2.get_data()
+				decode_metadata_name = False
 			elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
 				mybinpkg = portage.gpkg.gpkg(self.settings, mycpv, binpkg_path)
 				mydata = mybinpkg.get_metadata()
+				decode_metadata_name = True
 			else:
 				continue
 
 			updated_items = update_dbentries([mylist], mydata, parent=mycpv)
 			mydata.update(updated_items)
-			if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
-				mydata[b'PF'] = \
-					_unicode_encode(mynewpkg + "\n",
-					encoding=_encodings['repo.content'])
-				mydata[b'CATEGORY'] = \
-					_unicode_encode(mynewcat + "\n",
-					encoding=_encodings['repo.content'])
-			elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
+			if decode_metadata_name:
 				mydata['PF'] = \
 					_unicode_encode(mynewpkg + "\n",
 					encoding=_encodings['repo.content'])
 				mydata['CATEGORY'] = \
+					_unicode_encode(mynewcat + "\n",
+					encoding=_encodings['repo.content'])
+			else:
+				mydata[b'PF'] = \
+					_unicode_encode(mynewpkg + "\n",
+					encoding=_encodings['repo.content'])
+				mydata[b'CATEGORY'] = \
 					_unicode_encode(mynewcat + "\n",
 					encoding=_encodings['repo.content'])
 			if mynewpkg != myoldpkg:
@@ -584,7 +590,7 @@ class binarytree:
 			del self._pkg_paths[self.dbapi._instance_key(mycpv)]
 			metadata = self.dbapi._aux_cache_slot_dict()
 			for k in self.dbapi._aux_cache_keys:
-				v = mydata.get(_unicode_encode(k))
+				v = mydata.get(k if decode_metadata_name else _unicode_encode(k))
 				if v is not None:
 					v = _unicode_decode(v)
 					metadata[k] = " ".join(v.split())
