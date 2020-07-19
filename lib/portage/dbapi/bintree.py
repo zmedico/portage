@@ -162,7 +162,8 @@ class bindbapi(fakedbapi):
 				metadata_bytes = portage.gpkg.gpkg(self.settings, mycpv,
 					binpkg_path).get_metadata()
 			else:
-				return
+				raise InvalidBinaryPackageFormat(
+					"Unknown binary package format %s" % binpkg_path)
 
 			def getitem(k):
 				if k == "_mtime_":
@@ -224,7 +225,8 @@ class bindbapi(fakedbapi):
 			mydata = mybinpkg.get_metadata()
 			encoding_key = False
 		else:
-			return
+			raise InvalidBinaryPackageFormat("Unknown binary package format %s"
+				% binpkg_path)
 
 		for k, v in values.items():
 			if encoding_key:
@@ -242,7 +244,8 @@ class bindbapi(fakedbapi):
 		elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
 			mybinpkg.update_metadata(mydata)
 		else:
-			return
+			raise InvalidBinaryPackageFormat("Unknown binary package format %s"
+				% binpkg_path)
 
 		# inject will clear stale caches via cpv_inject.
 		self.bintree.inject(cpv, filename=binpkg_path)
