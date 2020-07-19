@@ -278,9 +278,7 @@ HWhcS+9vk1Q4/qMk2Q4=
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
 		
-		gpg_test_path = os.path.join(
-			os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
-			".gnupg")
+		gpg_test_path = os.environ["GNUPGHOME"]
 
 		playground = ResolverPlayground(
 			user_config={

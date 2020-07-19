@@ -478,9 +478,7 @@ class ResolverPlayground(object):
 				#Create profile symlink
 				os.symlink(sub_profile_dir, os.path.join(user_config_dir, "make.profile"))
 
-		gpg_test_path = os.path.join(
-			os.path.dirname(os.path.dirname(os.path.realpath(__file__))),
-			".gnupg")
+		gpg_test_path = os.environ["GNUPGHOME"]
 			
 		make_conf = {
 			"ACCEPT_KEYWORDS": "x86",
