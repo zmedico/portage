@@ -516,12 +516,6 @@ class gpkg(object):
 		if self.compression in ["", "none"]:
 			self.compression = None
 
-		self.compresslevel = self.settings.get("BINPKG_COMPRESS_LEVEL", 9)
-		try:
-			self.compresslevel = int(self.compresslevel)
-		except ValueError:
-			self.compresslevel = 9
-
 		# The create_signature is whether create signature for the package or not.
 		if "binpkg-signing" in self.settings.features:
 			self.create_signature = True
