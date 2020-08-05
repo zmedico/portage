@@ -15,7 +15,7 @@ from portage.util import (
 	shlex_split,
 	varexpand,
 )
-from portage.const import SUPPORTED_XPAK_EXTENSIONS, SUPPORTED_GPKG_EXTENSIONS 
+from portage.const import SUPPORTED_XPAK_EXTENSIONS
 from portage.exception import InvalidBinaryPackageFormat
 import signal
 import subprocess

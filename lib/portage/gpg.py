@@ -11,7 +11,7 @@ from portage.exception import GPGException
 from portage.output import colorize
 from portage.util import shlex_split, varexpand, writemsg, writemsg_stdout
 
-class GPG(object):
+class GPG:
 	"""
 	Unlock GPG, must call dircetly from main program for get correct TTY
 	"""
@@ -32,13 +32,13 @@ class GPG(object):
 		Set GPG_TTY and run GPG unlock command.
 		If gpg-keepalive is set, start keepalive thread.
 		"""
-		if (self.GPG_unlock_command 
+		if (self.GPG_unlock_command
 			and (self.settings.get("BINPKG_FORMAT", "xpak") == "gpkg")):
 			try:
 				os.environ["GPG_TTY"] = os.ttyname(sys.stdout.fileno())
 			except OSError as e:
 				# When run with no input/output tty, this will fail.
-				# However, if the password is given by command, 
+				# However, if the password is given by command,
 				# GPG does not need to ask password, so can be ignored.
 				writemsg(colorize("WARN", str(e)) + '\n')
 

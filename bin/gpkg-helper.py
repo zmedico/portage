@@ -24,7 +24,7 @@ def command_compose(args):
 		sys.stderr.write("Argument 3 is not a directory: '%s'\n" % \
 			metadata_dir)
 		return 1
-	
+
 	if not os.path.isdir(image_dir):
 		sys.stderr.write(usage)
 		sys.stderr.write("Argument 4 is not a directory: '%s'\n" % \

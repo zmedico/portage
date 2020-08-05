@@ -1,12 +1,10 @@
 # Copright Gentoo Foundation 2006-2020
 # Portage Unit Testing Functionality
 
-import random
 import sys
 import tempfile
 import io
 import tarfile
-from functools import partial
 from os import urandom
 
 import portage.gpkg
@@ -19,7 +17,7 @@ class test_gpkg_stream_case(TestCase):
 	def test_gpkg_stream_reader(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		data = urandom(1048576)
 		data_io = io.BytesIO(data)
 		data_io.seek(0)
@@ -31,7 +29,7 @@ class test_gpkg_stream_case(TestCase):
 	def test_gpkg_stream_reader_without_cmd(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		data = urandom(1048576)
 		data_io = io.BytesIO(data)
 		data_io.seek(0)
@@ -43,7 +41,7 @@ class test_gpkg_stream_case(TestCase):
 	def test_gpkg_stream_reader_kill(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		data = urandom(1048576)
 		data_io = io.BytesIO(data)
 		data_io.seek(0)
@@ -58,7 +56,7 @@ class test_gpkg_stream_case(TestCase):
 	def test_gpkg_stream_reader_kill_without_cmd(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		data = urandom(1048576)
 		data_io = io.BytesIO(data)
 		data_io.seek(0)
@@ -70,7 +68,7 @@ class test_gpkg_stream_case(TestCase):
 	def test_gpkg_stream_writer(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		tmpdir = tempfile.mkdtemp()
 		try:
 			gpkg_file_loc = os.path.join(tmpdir, 'test.gpkg.tar')
@@ -91,7 +89,7 @@ class test_gpkg_stream_case(TestCase):
 	def test_gpkg_stream_writer_without_cmd(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		tmpdir = tempfile.mkdtemp()
 
 		try:

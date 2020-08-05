@@ -54,7 +54,7 @@ class test_gpkg_path_case(TestCase):
 				# container
 				self.assertEqual(test_gpkg._get_tar_format(container),
 					tarfile.USTAR_FORMAT)
-				
+
 			with tarfile.open(gpkg_file_loc, 'r') as container:
 				metadata = io.BytesIO(
 					container.extractfile('test/metadata.tar').read())
@@ -119,7 +119,7 @@ class test_gpkg_path_case(TestCase):
 				# container
 				self.assertEqual(test_gpkg._get_tar_format(container),
 					tarfile.USTAR_FORMAT)
-				
+
 			with tarfile.open(gpkg_file_loc, 'r') as container:
 				metadata = io.BytesIO(
 					container.extractfile('test/metadata.tar').read())
@@ -178,7 +178,7 @@ class test_gpkg_path_case(TestCase):
 				# container
 				self.assertEqual(test_gpkg._get_tar_format(container),
 					tarfile.USTAR_FORMAT)
-				
+
 			with tarfile.open(gpkg_file_loc, 'r') as container:
 				metadata = io.BytesIO(
 					container.extractfile('test/metadata.tar').read())

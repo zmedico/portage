@@ -424,8 +424,8 @@ class binarytree:
 			self._pkgindex_keys = self.dbapi._aux_cache_keys.copy()
 			self._pkgindex_keys.update(["CPV", "SIZE"])
 			self._pkgindex_aux_keys = \
-				["BASE_URI", "BDEPEND", "BINPKG_FORMAT", "BUILD_ID", 
-				"BUILD_TIME", "CHOST", "DEFINED_PHASES", "DEPEND", 
+				["BASE_URI", "BDEPEND", "BINPKG_FORMAT", "BUILD_ID",
+				"BUILD_TIME", "CHOST", "DEFINED_PHASES", "DEPEND",
 				"DESCRIPTION", "EAPI", "IUSE", "KEYWORDS", "LICENSE",
 				"PDEPEND", "PKGINDEX_URI", "PROPERTIES", "PROVIDES",
 				"RDEPEND", "repository", "REQUIRES", "RESTRICT",
@@ -437,7 +437,7 @@ class binarytree:
 			self._pkgindex_header = None
 			self._pkgindex_header_keys = set([
 				"ACCEPT_KEYWORDS", "ACCEPT_LICENSE",
-				"ACCEPT_PROPERTIES", "ACCEPT_RESTRICT", "BINPKG_FORMAT", 
+				"ACCEPT_PROPERTIES", "ACCEPT_RESTRICT", "BINPKG_FORMAT",
 				"CBUILD", "CONFIG_PROTECT", "CONFIG_PROTECT_MASK", "FEATURES",
 				"GENTOO_MIRRORS", "INSTALL_MASK", "IUSE_IMPLICIT", "USE",
 				"USE_EXPAND", "USE_EXPAND_HIDDEN", "USE_EXPAND_IMPLICIT",
@@ -462,7 +462,7 @@ class binarytree:
 				"SLOT"    : "0",
 				"USE"     : "",
 			}
-			self._pkgindex_inherited_keys = ["BINPKG_FORMAT", "CHOST", 
+			self._pkgindex_inherited_keys = ["BINPKG_FORMAT", "CHOST",
 				"repository"]
 
 			# Populate the header with appropriate defaults.
@@ -817,7 +817,7 @@ class binarytree:
 								update_pkgindex = True
 							# Omit PATH if it is the default path for
 							# the current Packages format version.
-							if ((mypath != mycpv + ".tbz2") 
+							if ((mypath != mycpv + ".tbz2")
 								and (mypath != mycpv + ".gpkg.tar")):
 								d["PATH"] = mypath
 								if not oldpath:
@@ -840,7 +840,7 @@ class binarytree:
 					mycat = pkg_metadata.get("CATEGORY", "")
 					mypf = pkg_metadata.get("PF", "")
 					slot = pkg_metadata.get("SLOT", "")
-					for ext in (SUPPORTED_XPAK_EXTENSIONS 
+					for ext in (SUPPORTED_XPAK_EXTENSIONS
 						+ SUPPORTED_GPKG_EXTENSIONS):
 						if myfile.endswith(ext):
 							mypkg = myfile[:-len(ext)]
@@ -1389,7 +1389,7 @@ class binarytree:
 			metadata = self.dbapi._aux_cache_slot_dict()
 		else:
 			metadata = {}
-		
+
 		# xpak return key as binary, gpkg return key as str
 		decode_metadata_name = True
 

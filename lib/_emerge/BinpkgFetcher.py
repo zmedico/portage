@@ -11,8 +11,6 @@ import stat
 import sys
 import portage
 from portage import os
-from portage.const import (SUPPORTED_XPAK_EXTENSIONS,
-	SUPPORTED_GPKG_EXTENSIONS)
 from portage.exception import FileNotFound, InvalidBinaryPackageFormat
 from portage.util._async.AsyncTaskFuture import AsyncTaskFuture
 from portage.util._pty import _create_pty_or_pipe

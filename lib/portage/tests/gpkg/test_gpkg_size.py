@@ -3,14 +3,9 @@
 
 import tempfile
 import tarfile
-import io
 import sys
-from os import urandom
-import gzip
 
-from portage import os
 from portage import shutil
-from portage.util._compare_files import compare_files
 from portage.tests import TestCase
 from portage.tests.resolver.ResolverPlayground import ResolverPlayground
 from portage.gpkg import gpkg

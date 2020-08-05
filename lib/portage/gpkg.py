@@ -10,10 +10,7 @@ import pwd
 import grp
 import stat
 import sys
-import hashlib
 import tempfile
-import traceback
-import copy
 from datetime import datetime
 
 from portage import checksum
@@ -23,25 +20,23 @@ from portage import normalize_path
 from portage import _encodings
 from portage import _unicode_decode
 from portage import _unicode_encode
-from portage.exception import (InvalidData, FileNotFound,
-	IncorrectParameter, InvalidBinaryPackageFormat,
+from portage.exception import (FileNotFound, InvalidBinaryPackageFormat,
 	InvalidCompressionMethod, CompressorNotFound,
-	CompressorOperationFailed, CommandNotFound,
-	GPGException, DigestException, MissingSignature, 
-	InvalidSignature, UntrustedSignature, SecurityViolation)
+	CompressorOperationFailed, CommandNotFound, GPGException,
+	DigestException, MissingSignature, InvalidSignature)
 from portage.output import colorize
 from portage.util._urlopen import urlopen
 from portage.util import writemsg
-from portage.util import ensure_dirs, shlex_split, varexpand
+from portage.util import shlex_split, varexpand
 from portage.util.compression_probe import _compressors
 from portage.process import find_binary
 from portage.package.ebuild.config import config
 from portage.const import MANIFEST2_HASH_DEFAULTS, HASHING_BLOCKSIZE
 
 
-class tar_stream_writer(object):
+class tar_stream_writer:
 	"""
-	One-pass helper function that return a file-like object 
+	One-pass helper function that return a file-like object
 	for create a file inside of a tar container.
 
 	This helper allowed streaming add a new file to tar
@@ -215,14 +210,14 @@ class tar_stream_writer(object):
 		self.closed = True
 
 
-class tar_stream_reader(object):
+class tar_stream_reader:
 	"""
-	helper function that return a file-like object 
+	helper function that return a file-like object
 	for read a file inside of a tar container.
 
 	This helper allowed transparently streaming read a compressed
 	file in tar.
-	
+
 	With optional call and pipe compressed data through external
 	program, and return the uncompressed data.
 
@@ -337,7 +332,7 @@ class tar_stream_reader(object):
 				self.proc.stderr.close()
 
 
-class checksum_helper(object):
+class checksum_helper:
 	"""
 	Do checksum generation and GPG Signature generation and verification
 	"""
@@ -381,7 +376,7 @@ class checksum_helper(object):
 				raise CommandNotFound("GPG signing command is not set")
 
 			self.gpg_proc = subprocess.Popen(self.GPG_signing_command,
-				stdin=subprocess.PIPE, stdout=subprocess.PIPE, 
+				stdin=subprocess.PIPE, stdout=subprocess.PIPE,
 				stderr=subprocess.PIPE)
 
 		elif self.gpg_operation == checksum_helper.VERIFY:
@@ -484,7 +479,7 @@ class checksum_helper(object):
 					raise InvalidSignature("GPG verify failed")
 
 
-class gpkg(object):
+class gpkg:
 	"""
 	Gentoo binary package
 	https://www.gentoo.org/glep/glep-0078.html
@@ -500,7 +495,7 @@ class gpkg(object):
 		"""
 		if sys.version_info.major < 3:
 			raise InvalidBinaryPackageFormat("GPKG not support Python 2")
-		self.settings = settings 
+		self.settings = settings
 		self.gpkg_version = 'gpkg-1'
 		if gpkg_file is None:
 			self.gpkg_file = None
@@ -510,7 +505,7 @@ class gpkg(object):
 		self.base_name = base_name
 		self.checksums = []
 
-		# Compression is the compression algorithm, if set to None will 
+		# Compression is the compression algorithm, if set to None will
 		# not use compression.
 		self.compression = self.settings.get("BINPKG_COMPRESS", None)
 		if self.compression in ["", "none"]:
@@ -618,7 +613,7 @@ class gpkg(object):
 
 			# If need more data
 			if end_size > 10000000:
-				raise InvalidBinaryPackageFormat("metadata too large " 
+				raise InvalidBinaryPackageFormat("metadata too large "
 					+ str(end_size))
 			if end_size > init_size:
 				container_file.seek(0, io.SEEK_END)
@@ -778,12 +773,12 @@ class gpkg(object):
 				manifest_old = self._load_manifest(
 					container_old.extractfile("Manifest"
 						).read().decode("UTF-8"))
-				
+
 				for m in manifest_old:
 					if m[1] == image_old_tarinfo.name:
 						self.checksums.append(m)
 						break
-				
+
 				container.addfile(image_old_tarinfo,
 					container_old.extractfile(image_old_tarinfo))
 
@@ -843,7 +838,7 @@ class gpkg(object):
 	def _quickpkg(self, contents, metadata, root_dir, protect=None):
 		"""
 		Similar to compress, but for quickpkg.
-		Will compress the given files to image with root, 
+		Will compress the given files to image with root,
 		ignoring all other files.
 		"""
 
@@ -1160,7 +1155,7 @@ class gpkg(object):
 
 				f_signature = f + ".sig"
 
-				# Find current file manifest record			
+				# Find current file manifest record
 				manifest_record = None
 				for m in manifest:
 					if m[1] == f:
@@ -1171,7 +1166,7 @@ class gpkg(object):
 
 				if int(manifest_record[2]) != int(container.getmember(f).size):
 					raise DigestException("%s file size mismatched" % f)
-				
+
 				# Ignore image file and signature if not needed
 				if (os.path.basename(f).startswith("image") and metadata_only):
 					unverified_files.remove(f)
@@ -1198,10 +1193,10 @@ class gpkg(object):
 							gpg_operation=checksum_helper.VERIFY,
 							signature=signature)
 					else:
-						raise MissingSignature("%s signature not found" % f) 
+						raise MissingSignature("%s signature not found" % f)
 				else:
 					checksum_info = checksum_helper(self.settings)
-				
+
 				# Verify current file checksum
 				f_io = container.extractfile(f)
 				while True:
@@ -1212,12 +1207,12 @@ class gpkg(object):
 						checksum_info.finish()
 						break
 				f_io.close()
-				
+
 				# At least one supported checksum must be checked
 				verified_hash_count = 0
 				for c in checksum_info.libs:
 					try:
-						if (checksum_info.libs[c].hexdigest().lower() == 
+						if (checksum_info.libs[c].hexdigest().lower() ==
 							manifest_record[manifest_record.index(c) + 1].lower()):
 							verified_hash_count += 1
 						else:
@@ -1328,10 +1323,10 @@ class gpkg(object):
 
 		return(None)
 
-	def _get_tar_format_from_stats(self, image_max_path_length, 
+	def _get_tar_format_from_stats(self, image_max_path_length,
 		image_max_file_size, image_total_size):
 		"""
-		Choose the corresponding tar format according to 
+		Choose the corresponding tar format according to
 		the image information
 		"""
 		# Max possible size in UStar is 8 GiB (8589934591 bytes)
@@ -1522,7 +1517,7 @@ class gpkg(object):
 
 		# If failed, try get any file name matched
 		if inner_tarinfo is None:
-			for f in all_files: 
+			for f in all_files:
 				try:
 					f_name, f_comp = self._extract_filename_compression(f.name)
 				except InvalidCompressionMethod:

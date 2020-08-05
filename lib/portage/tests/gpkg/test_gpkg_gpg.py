@@ -9,24 +9,18 @@ from os import urandom
 
 from portage import os
 from portage import shutil
-from portage.util._compare_files import compare_files
 from portage.tests import TestCase
 from portage.tests.resolver.ResolverPlayground import ResolverPlayground
 from portage.gpkg import gpkg
 from portage.gpg import GPG
-from portage.exception import (InvalidData, FileNotFound,
-	IncorrectParameter, InvalidBinaryPackageFormat,
-	InvalidCompressionMethod, CompressorNotFound,
-	CompressorOperationFailed, CommandNotFound,
-	GPGException, DigestException, MissingSignature, 
-	InvalidSignature, UntrustedSignature, SecurityViolation)
+from portage.exception import MissingSignature, InvalidSignature
 
 
 class test_gpkg_gpg_case(TestCase):
 	def test_gpkg_missing_manifest_signature(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -48,7 +42,7 @@ class test_gpkg_gpg_case(TestCase):
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -60,11 +54,11 @@ class test_gpkg_gpg_case(TestCase):
 					for f in tar_1.getmembers():
 						if f.name != "Manifest.sig":
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
 
-			self.assertRaises(MissingSignature, 
+			self.assertRaises(MissingSignature,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
@@ -73,7 +67,7 @@ class test_gpkg_gpg_case(TestCase):
 	def test_gpkg_missing_signature(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -95,7 +89,7 @@ class test_gpkg_gpg_case(TestCase):
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -109,10 +103,10 @@ class test_gpkg_gpg_case(TestCase):
 							pass
 						else:
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
-			self.assertRaises(MissingSignature, 
+			self.assertRaises(MissingSignature,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 
 		finally:
@@ -122,7 +116,7 @@ class test_gpkg_gpg_case(TestCase):
 	def test_gpkg_ignore_signature(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -144,7 +138,7 @@ class test_gpkg_gpg_case(TestCase):
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -158,7 +152,7 @@ class test_gpkg_gpg_case(TestCase):
 							pass
 						else:
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
 			binpkg_2.decompress(os.path.join(tmpdir, "test"))
@@ -169,7 +163,7 @@ class test_gpkg_gpg_case(TestCase):
 	def test_gpkg_auto_use_signature(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -191,7 +185,7 @@ class test_gpkg_gpg_case(TestCase):
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -205,10 +199,10 @@ class test_gpkg_gpg_case(TestCase):
 							pass
 						else:
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
-			self.assertRaises(MissingSignature, 
+			self.assertRaises(MissingSignature,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
@@ -217,7 +211,7 @@ class test_gpkg_gpg_case(TestCase):
 	def test_gpkg_invalid_signature(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -239,7 +233,7 @@ class test_gpkg_gpg_case(TestCase):
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -265,10 +259,10 @@ HWhcS+9vk1Q4/qMk2Q4=
 							data.close()
 						else:
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
-			self.assertRaises(InvalidSignature, 
+			self.assertRaises(InvalidSignature,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
@@ -277,7 +271,7 @@ HWhcS+9vk1Q4/qMk2Q4=
 	def test_gpkg_untrusted_signature(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		gpg_test_path = os.environ["GNUPGHOME"]
 
 		playground = ResolverPlayground(
@@ -314,14 +308,14 @@ HWhcS+9vk1Q4/qMk2Q4=
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
 
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
-			self.assertRaises(InvalidSignature, 
+			self.assertRaises(InvalidSignature,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 
 		finally:
@@ -331,7 +325,7 @@ HWhcS+9vk1Q4/qMk2Q4=
 	def test_gpkg_unknown_signature(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -353,7 +347,7 @@ HWhcS+9vk1Q4/qMk2Q4=
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -379,10 +373,10 @@ IkCfAP49AOYjzuQPP0n5P0SGCINnAVEXN7QLQ4PurY/lt7cT2gEAq01stXjFhrz5
 							data.close()
 						else:
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
-			self.assertRaises(InvalidSignature, 
+			self.assertRaises(InvalidSignature,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 
 		finally:

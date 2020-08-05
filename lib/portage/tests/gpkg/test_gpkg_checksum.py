@@ -9,24 +9,17 @@ from os import urandom
 
 from portage import os
 from portage import shutil
-from portage.util._compare_files import compare_files
 from portage.tests import TestCase
 from portage.tests.resolver.ResolverPlayground import ResolverPlayground
 from portage.gpkg import gpkg
-from portage.gpg import GPG
-from portage.exception import (InvalidData, FileNotFound,
-	IncorrectParameter, InvalidBinaryPackageFormat,
-	InvalidCompressionMethod, CompressorNotFound,
-	CompressorOperationFailed, CommandNotFound,
-	GPGException, DigestException, MissingSignature, 
-	InvalidSignature, UntrustedSignature, SecurityViolation)
+from portage.exception import InvalidBinaryPackageFormat, DigestException, MissingSignature
 
 
 class test_gpkg_checksum_case(TestCase):
 	def test_gpkg_missing_header(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -46,7 +39,7 @@ class test_gpkg_checksum_case(TestCase):
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -58,11 +51,11 @@ class test_gpkg_checksum_case(TestCase):
 					for f in tar_1.getmembers():
 						if f.name != binpkg_1.gpkg_version:
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
 
-			self.assertRaises(InvalidBinaryPackageFormat, 
+			self.assertRaises(InvalidBinaryPackageFormat,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
@@ -71,7 +64,7 @@ class test_gpkg_checksum_case(TestCase):
 	def test_gpkg_missing_manifest(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -91,7 +84,7 @@ class test_gpkg_checksum_case(TestCase):
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -103,11 +96,11 @@ class test_gpkg_checksum_case(TestCase):
 					for f in tar_1.getmembers():
 						if f.name != "Manifest":
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
 
-			self.assertRaises(MissingSignature, 
+			self.assertRaises(MissingSignature,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
@@ -116,7 +109,7 @@ class test_gpkg_checksum_case(TestCase):
 	def test_gpkg_missing_files(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -140,7 +133,7 @@ class test_gpkg_checksum_case(TestCase):
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data2"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -152,11 +145,11 @@ class test_gpkg_checksum_case(TestCase):
 					for f in tar_1.getmembers():
 						if "image.tar" not in f.name:
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
 
-			self.assertRaises(DigestException, 
+			self.assertRaises(DigestException,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
@@ -165,7 +158,7 @@ class test_gpkg_checksum_case(TestCase):
 	def test_gpkg_extra_files(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -201,11 +194,11 @@ class test_gpkg_checksum_case(TestCase):
 					data2 = io.BytesIO(data)
 					tar_2.addfile(data_tarinfo, data2)
 					data2.close()
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
-			
-			self.assertRaises(DigestException, 
+
+			self.assertRaises(DigestException,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
@@ -214,7 +207,7 @@ class test_gpkg_checksum_case(TestCase):
 	def test_gpkg_incorrect_checksum(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -234,7 +227,7 @@ class test_gpkg_checksum_case(TestCase):
 			data = urandom(1048576)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -253,11 +246,11 @@ class test_gpkg_checksum_case(TestCase):
 							data.close()
 						else:
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
-			
-			self.assertRaises(DigestException, 
+
+			self.assertRaises(DigestException,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
@@ -266,7 +259,7 @@ class test_gpkg_checksum_case(TestCase):
 	def test_gpkg_duplicate_files(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -286,7 +279,7 @@ class test_gpkg_checksum_case(TestCase):
 			data = urandom(100)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -298,20 +291,20 @@ class test_gpkg_checksum_case(TestCase):
 					for f in tar_1.getmembers():
 						tar_2.addfile(f, tar_1.extractfile(f))
 						tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
 
-			self.assertRaises(InvalidBinaryPackageFormat, 
+			self.assertRaises(InvalidBinaryPackageFormat,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
 			playground.cleanup()
-		
+
 	def test_gpkg_manifest_duplicate_files(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -331,7 +324,7 @@ class test_gpkg_checksum_case(TestCase):
 			data = urandom(100)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -353,11 +346,11 @@ class test_gpkg_checksum_case(TestCase):
 							data.close()
 						else:
 							tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
 
-			self.assertRaises(DigestException, 
+			self.assertRaises(DigestException,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
@@ -366,7 +359,7 @@ class test_gpkg_checksum_case(TestCase):
 	def test_gpkg_different_size_file(self):
 		if sys.version_info.major < 3:
 			self.skipTest("Not support Python 2")
-		
+
 		playground = ResolverPlayground(
 			user_config={
 				"make.conf":
@@ -386,7 +379,7 @@ class test_gpkg_checksum_case(TestCase):
 			data = urandom(100)
 			with open(os.path.join(orig_full_path, "data"), 'wb') as f:
 				f.write(data)
-			
+
 			binpkg_1 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-1.gpkg.tar"))
 			binpkg_1.compress(orig_full_path, {})
@@ -398,11 +391,11 @@ class test_gpkg_checksum_case(TestCase):
 					for f in tar_1.getmembers():
 						tar_2.addfile(f, tar_1.extractfile(f))
 						tar_2.addfile(f, tar_1.extractfile(f))
-			
+
 			binpkg_2 = gpkg(settings, "test",
 				os.path.join(tmpdir, "test-2.gpkg.tar"))
 
-			self.assertRaises(InvalidBinaryPackageFormat, 
+			self.assertRaises(InvalidBinaryPackageFormat,
 				binpkg_2.decompress, os.path.join(tmpdir, "test"))
 		finally:
 			shutil.rmtree(tmpdir)
