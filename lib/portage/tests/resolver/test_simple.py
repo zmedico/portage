@@ -1,4 +1,4 @@
-# Copyright 2010-2012 Gentoo Foundation
+# Copyright 2010-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 from __future__ import print_function
@@ -13,7 +13,7 @@ class SimpleResolverTestCase(TestCase):
 
 	def testSimple(self):
 		ebuilds = {
-			"dev-libs/A-1": { "KEYWORDS": "x86" }, 
+			"dev-libs/A-1": { "KEYWORDS": "x86" },
 			"dev-libs/A-2": { "KEYWORDS": "~x86" },
 			"dev-libs/B-1.2": {},
 

@@ -1,4 +1,4 @@
-# Copyright 1999-2016 Gentoo Foundation
+# Copyright 1999-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 import difflib
@@ -9,13 +9,13 @@ from portage.dbapi.porttree import _parse_uri_map
 from portage.dbapi.IndexedPortdb import IndexedPortdb
 from portage.dbapi.IndexedVardb import IndexedVardb
 from portage.localization import localized_size
-from portage.output import  bold, bold as white, darkgreen, green, red
+from portage.output import bold, darkgreen, green, red
 from portage.util import writemsg_stdout
 from portage.util.iterators.MultiIterGroupBy import MultiIterGroupBy
 
 from _emerge.Package import Package
 
-class search(object):
+class search:
 
 	#
 	# class constants
@@ -333,7 +333,7 @@ class search(object):
 				match_string = setname
 			else:
 				match_string = setname.split("/")[-1]
-			
+
 			if self.searchre.search(match_string):
 				yield ("set", setname)
 			elif self.searchdesc:
@@ -356,7 +356,7 @@ class search(object):
 	def output(self):
 		"""Outputs the results of the search."""
 
-		class msg(object):
+		class msg:
 			@staticmethod
 			def append(msg):
 				writemsg_stdout(msg, noiselevel=-1)
@@ -409,11 +409,11 @@ class search(object):
 
 					desc = metadata["DESCRIPTION"]
 					homepage = metadata["HOMEPAGE"]
-					license = metadata["LICENSE"]
+					license = metadata["LICENSE"] # pylint: disable=redefined-builtin
 
 					if masked:
 						msg.append(green("*") + "  " + \
-							white(match) + " " + red("[ Masked ]") + "\n")
+							bold(match) + " " + red("[ Masked ]") + "\n")
 					else:
 						msg.append(green("*") + "  " + bold(match) + "\n")
 					myversion = self.getVersion(full_package, search.VERSION_RELEASE)
@@ -526,4 +526,3 @@ class search(object):
 		else:
 			result = ""
 		return result
-

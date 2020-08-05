@@ -1,16 +1,14 @@
-# Copyright 1999-2013 Gentoo Foundation
+# Copyright 1999-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 import collections
 from itertools import chain
-import sys
 
-from portage import _encodings, _unicode_encode
 from portage.output import red
 from portage.util import cmp_sort_key
 from portage.output import blue
 
-class UseFlagDisplay(object):
+class UseFlagDisplay:
 
 	__slots__ = ('name', 'enabled', 'forced')
 
@@ -29,14 +27,6 @@ class UseFlagDisplay(object):
 		if self.forced:
 			s = '(%s)' % s
 		return s
-
-	if sys.hexversion < 0x3000000:
-
-		__unicode__ = __str__
-
-		def __str__(self):
-			return _unicode_encode(self.__unicode__(),
-				encoding=_encodings['content'])
 
 	def _cmp_combined(a, b):
 		"""

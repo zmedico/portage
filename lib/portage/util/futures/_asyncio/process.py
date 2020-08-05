@@ -12,7 +12,7 @@ from portage.util.futures._asyncio.streams import _reader, _writer
 from portage.util.futures.compat_coroutine import coroutine, coroutine_return
 
 
-class _Process(object):
+class _Process:
 	"""
 	Emulate a subset of the asyncio.subprocess.Process interface,
 	for python2.
@@ -39,7 +39,7 @@ class _Process(object):
 		return self._proc.returncode
 
 	@coroutine
-	def communicate(self, input=None):
+	def communicate(self, input=None): # pylint: disable=redefined-builtin
 		"""
 		Read data from stdout and stderr, until end-of-file is reached.
 		Wait for process to terminate.

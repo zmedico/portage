@@ -1,5 +1,5 @@
 # SOCKSv5 proxy manager for network-sandbox
-# Copyright 2015-2019 Gentoo Authors
+# Copyright 2015-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 import errno
@@ -14,8 +14,7 @@ from portage.process import atexit_register, spawn
 from portage.util.futures.compat_coroutine import coroutine
 from portage.util.futures import asyncio
 
-
-class ProxyManager(object):
+class ProxyManager:
 	"""
 	A class to start and control a single running SOCKSv5 server process
 	for Portage.
@@ -33,10 +32,6 @@ class ProxyManager(object):
 		paths)
 		@type settings: portage.config
 		"""
-		try:
-			import asyncio  # NOQA
-		except ImportError:
-			raise NotImplementedError('SOCKSv5 proxy requires asyncio module')
 
 		tmpdir = os.path.join(settings['PORTAGE_TMPDIR'], 'portage')
 		ensure_dirs_kwargs = {}

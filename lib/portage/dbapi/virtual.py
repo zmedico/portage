@@ -1,4 +1,4 @@
-# Copyright 1998-2013 Gentoo Foundation
+# Copyright 1998-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 from portage.dbapi import dbapi
@@ -123,8 +123,7 @@ class fakedbapi(dbapi):
 	def cpv_all(self):
 		if self._multi_instance:
 			return [x[0] for x in self.cpvdict]
-		else:
-			return list(self.cpvdict)
+		return list(self.cpvdict)
 
 	def cpv_inject(self, mycpv, metadata=None):
 		"""Adds a cpv to the list of available packages. See the
@@ -213,9 +212,9 @@ class fakedbapi(dbapi):
 			raise KeyError(cpv)
 		metadata.update(values)
 
-class testdbapi(object):
+class testdbapi:
 	"""A dbapi instance with completely fake functions to get by hitting disk
-	TODO(antarus): 
+	TODO(antarus):
 	This class really needs to be rewritten to have better stubs; but these work for now.
 	The dbapi classes themselves need unit tests...and that will be a lot of work.
 	"""

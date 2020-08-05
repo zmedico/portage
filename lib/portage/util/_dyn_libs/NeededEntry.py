@@ -1,13 +1,10 @@
-# Copyright 2015 Gentoo Foundation
+# Copyright 2015-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-import sys
-
-from portage import _encodings, _unicode_encode
 from portage.exception import InvalidData
 from portage.localization import _
 
-class NeededEntry(object):
+class NeededEntry:
 	"""
 	Represents one entry (line) from a NEEDED.ELF.2 file. The entry
 	must have 5 or more semicolon-delimited fields in order to be
@@ -73,13 +70,3 @@ class NeededEntry(object):
 				(self.multilib_category if self.multilib_category
 				is not None else "")
 		]) + "\n"
-
-	if sys.hexversion < 0x3000000:
-
-		__unicode__ = __str__
-
-		def __str__(self):
-			return _unicode_encode(self.__unicode__(),
-				encoding=_encodings['content'])
-
-		__str__.__doc__ = __unicode__.__doc__

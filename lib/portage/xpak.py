@@ -24,7 +24,6 @@ __all__ = [
 
 import array
 import errno
-import sys
 
 import portage
 from portage import os
@@ -78,8 +77,6 @@ def encodeint(myint):
 def decodeint(mystring):
 	"""Takes a 4 byte string and converts it into a 4 byte integer.
 	Returns an integer."""
-	if sys.hexversion < 0x3000000:
-		mystring = [ord(x) for x in mystring]
 	myint = 0
 	myint += mystring[3]
 	myint += mystring[2] << 8
@@ -154,11 +151,11 @@ def xsplit(infile):
 		encoding=_encodings['fs'], errors='strict'), 'rb')
 	mydat = myfile.read()
 	myfile.close()
-	
+
 	splits = xsplit_mem(mydat)
 	if not splits:
 		return False
-	
+
 	myfile = open(_unicode_encode(infile + '.index',
 		encoding=_encodings['fs'], errors='strict'), 'wb')
 	myfile.write(splits[0])
@@ -239,7 +236,7 @@ def searchindex(myindex, myitem):
 				datalen = decodeint(myindex[startpos + 8 + mytestlen:startpos + 12 + mytestlen])
 				return datapos, datalen
 		startpos = startpos + mytestlen + 12
-		
+
 def getitem(myid, myitem):
 	myindex = myid[0]
 	mydata = myid[1]
@@ -276,7 +273,7 @@ def xpand(myid, mydest):
 		mydat.close()
 		startpos = startpos + namelen + 12
 
-class tbz2(object):
+class tbz2:
 	def __init__(self, myfile):
 		self.file = myfile
 		self.filestat = None

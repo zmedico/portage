@@ -4,7 +4,6 @@
 
 import errno
 import io
-import sys
 import time
 import portage
 from portage import os
@@ -73,8 +72,6 @@ def process(mysettings, key, logentries, fulltext):
 		mode=elogdir_grp_mode, mask=0)
 
 	time_fmt = "%Y-%m-%d %H:%M:%S %Z"
-	if sys.hexversion < 0x3000000:
-		time_fmt = _unicode_encode(time_fmt)
 	time_str = time.strftime(time_fmt, time.localtime(time.time()))
 	# Avoid potential UnicodeDecodeError in Python 2, since strftime
 	# returns bytes in Python 2, and %Z may contain non-ascii chars.

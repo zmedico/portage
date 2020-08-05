@@ -12,32 +12,14 @@ __all__ = (
 	'TimeoutError',
 )
 
-try:
-	from asyncio import (
-		CancelledError,
-		Future,
-		InvalidStateError,
-		TimeoutError,
-	)
-except ImportError:
-
-	from portage.exception import PortageException
-
-	class Error(PortageException):
-		pass
-
-	class CancelledError(Error):
-		def __init__(self):
-			Error.__init__(self, "cancelled")
-
-	class TimeoutError(Error):
-		def __init__(self):
-			Error.__init__(self, "timed out")
-
-	class InvalidStateError(Error):
-		pass
-
-	Future = None
+# pylint: disable=redefined-builtin
+from asyncio import (
+	CancelledError,
+	Future,
+	InvalidStateError,
+	TimeoutError,
+)
+# pylint: enable=redefined-builtin
 
 import portage
 portage.proxy.lazyimport.lazyimport(globals(),
@@ -48,7 +30,7 @@ _PENDING = 'PENDING'
 _CANCELLED = 'CANCELLED'
 _FINISHED = 'FINISHED'
 
-class _EventLoopFuture(object):
+class _EventLoopFuture:
 	"""
 	This class provides (a subset of) the asyncio.Future interface, for
 	use with the EventLoop class, because EventLoop is currently
@@ -191,7 +173,3 @@ class _EventLoopFuture(object):
 		self._exception = exception
 		self._state = _FINISHED
 		self._schedule_callbacks()
-
-
-if Future is None:
-	Future = _EventLoopFuture

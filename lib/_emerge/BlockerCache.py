@@ -2,16 +2,11 @@
 # Distributed under the terms of the GNU General Public License v2
 
 import errno
-import sys
 from portage.util import writemsg
 from portage.data import secpass
 import portage
 from portage import os
-
-try:
-	import cPickle as pickle
-except ImportError:
-	import pickle
+import pickle
 
 class BlockerCache(portage.cache.mappings.MutableMapping):
 	"""This caches blockers of installed packages so that dep_check does not
@@ -25,7 +20,7 @@ class BlockerCache(portage.cache.mappings.MutableMapping):
 	# it's wasteful to update it for every vdb change.
 	_cache_threshold = 5
 
-	class BlockerData(object):
+	class BlockerData:
 
 		__slots__ = ("__weakref__", "atoms", "counter")
 
@@ -181,4 +176,3 @@ class BlockerCache(portage.cache.mappings.MutableMapping):
 		@return: An object with counter and atoms attributes.
 		"""
 		return self.BlockerData(*self._cache_data["blockers"][cpv])
-

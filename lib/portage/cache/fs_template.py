@@ -3,7 +3,6 @@
 # Author(s): Brian Harring (ferringb@gentoo.org)
 
 import os as _os
-import sys
 from portage.cache import template
 from portage import os
 
@@ -16,7 +15,7 @@ del lazyimport
 
 
 class FsBased(template.database):
-	"""template wrapping fs needed options, and providing _ensure_access as a way to 
+	"""template wrapping fs needed options, and providing _ensure_access as a way to
 	attempt to ensure files have the specified owners/perms"""
 
 	def __init__(self, *args, **config):
@@ -56,8 +55,8 @@ class FsBased(template.database):
 			path = self.location
 			base='/'
 
-		for dir in path.lstrip(os.path.sep).rstrip(os.path.sep).split(os.path.sep):
-			base = os.path.join(base,dir)
+		for d in path.lstrip(os.path.sep).rstrip(os.path.sep).split(os.path.sep):
+			base = os.path.join(base,d)
 			if ensure_dirs(base):
 				# We only call apply_permissions if ensure_dirs created
 				# a new directory, so as not to interfere with
@@ -87,4 +86,3 @@ def gen_label(base, label):
 	label = os.path.join(*(label.rstrip(os.path.sep).split(os.path.sep)))
 	tail = os.path.split(label)[1]
 	return "%s-%X" % (tail, abs(label.__hash__()))
-

@@ -1,7 +1,6 @@
 # Copyright 1999-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-import sys
 
 import portage
 from portage import os
@@ -14,7 +13,7 @@ from _emerge.Package import Package
 from _emerge.show_invalid_depstring_notice import show_invalid_depstring_notice
 
 
-class BlockerDB(object):
+class BlockerDB:
 
 	def __init__(self, fake_vartree):
 		root_config = fake_vartree._root_config

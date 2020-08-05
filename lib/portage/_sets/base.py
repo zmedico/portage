@@ -1,7 +1,6 @@
 # Copyright 2007-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-import sys
 from portage.dep import Atom, ExtendedAtomDict, best_match_to_list, match_from_list
 from portage.exception import InvalidAtom
 from portage.versions import cpv_getkey
@@ -9,14 +8,14 @@ from portage.versions import cpv_getkey
 
 OPERATIONS = ["merge", "unmerge"]
 
-class PackageSet(object):
-	# Set this to operations that are supported by your subclass. While 
+class PackageSet:
+	# Set this to operations that are supported by your subclass. While
 	# technically there is no difference between "merge" and "unmerge" regarding
 	# package sets, the latter doesn't make sense for some sets like "system"
 	# or "security" and therefore isn't supported by them.
 	_operations = ["merge"]
 	description = "generic package set"
-	
+
 	def __init__(self, allow_wildcard=False, allow_repo=False):
 		self._atoms = set()
 		self._atommap = ExtendedAtomDict(set)
@@ -31,7 +30,7 @@ class PackageSet(object):
 	def __contains__(self, atom):
 		self._load()
 		return atom in self._atoms or atom in self._nonatoms
-	
+
 	def __iter__(self):
 		self._load()
 		for x in self._atoms:
@@ -42,9 +41,6 @@ class PackageSet(object):
 	def __bool__(self):
 		self._load()
 		return bool(self._atoms or self._nonatoms)
-
-	if sys.hexversion < 0x3000000:
-		__nonzero__ = __bool__
 
 	def supportsOperation(self, op):
 		if not op in OPERATIONS:
@@ -100,13 +96,12 @@ class PackageSet(object):
 			if match_from_list(a, [cpv]):
 				return True
 		return False
-	
+
 	def getMetadata(self, key):
 		if hasattr(self, key.lower()):
 			return getattr(self, key.lower())
-		else:
-			return ""
-	
+		return ""
+
 	def _updateAtomMap(self, atoms=None):
 		"""Update self._atommap for specific atoms or all atoms."""
 		if not atoms:
@@ -114,7 +109,7 @@ class PackageSet(object):
 			atoms = self._atoms
 		for a in atoms:
 			self._atommap.setdefault(a.cp, set()).add(a)
-	
+
 	# Not sure if this one should really be in PackageSet
 	def findAtomForPackage(self, pkg, modified_use=None):
 		"""Return the best match for a given package from the arguments, or
@@ -159,7 +154,7 @@ class EditablePackageSet(PackageSet):
 
 	def __init__(self, allow_wildcard=False, allow_repo=False):
 		super(EditablePackageSet, self).__init__(allow_wildcard=allow_wildcard, allow_repo=allow_repo)
-		
+
 	def update(self, atoms):
 		self._load()
 		modified = False
@@ -184,7 +179,7 @@ class EditablePackageSet(PackageSet):
 			self._updateAtomMap(atoms=normal_atoms)
 		if modified:
 			self.write()
-	
+
 	def add(self, atom):
 		self.update([atom])
 
@@ -225,7 +220,7 @@ class InternalPackageSet(EditablePackageSet):
 	def clear(self):
 		self._atoms.clear()
 		self._updateAtomMap()
-	
+
 	def load(self):
 		pass
 
@@ -237,10 +232,10 @@ class DummyPackageSet(PackageSet):
 		super(DummyPackageSet, self).__init__()
 		if atoms:
 			self._setAtoms(atoms)
-	
+
 	def load(self):
 		pass
-	
+
 	def singleBuilder(cls, options, settings, trees):
 		atoms = options.get("packages", "").split()
 		return DummyPackageSet(atoms=atoms)

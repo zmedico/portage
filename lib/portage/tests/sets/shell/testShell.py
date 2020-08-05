@@ -1,5 +1,5 @@
 # testCommandOututSet.py -- Portage Unit Testing Functionality
-# Copyright 2007 Gentoo Foundation
+# Copyright 2007-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 from portage.process import find_binary
@@ -16,13 +16,13 @@ class CommandOutputSetTestCase(TestCase):
 		pass
 
 	def testCommand(self):
-		
-		input = set(test_cps)
+
+		params = set(test_cps)
 		command = find_binary("bash")
 		command += " -c '"
-		for a in input:
-		  command += " echo -e \"%s\" ; " % a
+		for a in params:
+			command += " echo -e \"%s\" ; " % a
 		command += "'"
 		s = CommandOutputSet(command)
 		atoms = s.getAtoms()
-		self.assertEqual(atoms, input)
+		self.assertEqual(atoms, params)

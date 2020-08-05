@@ -4,7 +4,6 @@
 from __future__ import division
 
 import re
-import sys
 from portage.cache import fs_template
 from portage.cache import cache_errors
 from portage import os
@@ -34,7 +33,7 @@ class database(fs_template.FsBased):
 		self._allowed_keys_set = frozenset(self._allowed_keys)
 		self._allowed_keys = sorted(self._allowed_keys_set)
 
-		self.location = os.path.join(self.location, 
+		self.location = os.path.join(self.location,
 			self.label.lstrip(os.path.sep).rstrip(os.path.sep))
 
 		if not self.readonly and not os.path.exists(self.location):
@@ -106,7 +105,7 @@ class database(fs_template.FsBased):
 		table_parameters.append("UNIQUE(%s)" % self._db_table["packages"]["package_key"])
 		create_statement.append(",".join(table_parameters))
 		create_statement.append(")")
-		
+
 		self._db_table["packages"]["create"] = " ".join(create_statement)
 
 		cursor = self._db_cursor
@@ -264,10 +263,9 @@ class database(fs_template.FsBased):
 		result = cursor.fetchall()
 		if len(result) == 0:
 			return False
-		elif len(result) == 1:
+		if len(result) == 1:
 			return True
-		else:
-			raise cache_errors.CacheCorruption(cpv, "key is not unique")
+		raise cache_errors.CacheCorruption(cpv, "key is not unique")
 
 	def __iter__(self):
 		"""generator for walking the dir struct"""

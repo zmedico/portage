@@ -1,4 +1,4 @@
-# Copyright 1999-2018 Gentoo Foundation
+# Copyright 1999-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 import functools
@@ -18,7 +18,7 @@ from _emerge.MiscFunctionsProcess import MiscFunctionsProcess
 from _emerge.TaskSequence import TaskSequence
 
 import portage
-from portage import _encodings, _unicode_decode, _unicode_encode, os
+from portage import _encodings, _unicode_encode, os
 from portage.package.ebuild.digestcheck import digestcheck
 from portage.package.ebuild.doebuild import _check_temp_dir
 from portage.package.ebuild._spawn_nofetch import SpawnNofetchWithoutBuilddir
@@ -159,18 +159,18 @@ class EbuildBuild(CompositeTask):
 						settings=self.settings),
 						self._default_final_exit)
 				return
-			else:
-				fetcher = EbuildFetcher(
-					config_pool=self.config_pool,
-					ebuild_path=self._ebuild_path,
-					fetchall=self.opts.fetch_all_uri,
-					fetchonly=self.opts.fetchonly,
-					background=False,
-					logfile=None,
-					pkg=self.pkg,
-					scheduler=self.scheduler)
-				self._start_task(fetcher, self._fetchonly_exit)
-				return
+
+			fetcher = EbuildFetcher(
+				config_pool=self.config_pool,
+				ebuild_path=self._ebuild_path,
+				fetchall=self.opts.fetch_all_uri,
+				fetchonly=self.opts.fetchonly,
+				background=False,
+				logfile=None,
+				pkg=self.pkg,
+				scheduler=self.scheduler)
+			self._start_task(fetcher, self._fetchonly_exit)
+			return
 
 		self._build_dir = EbuildBuildDir(
 			scheduler=self.scheduler, settings=settings)

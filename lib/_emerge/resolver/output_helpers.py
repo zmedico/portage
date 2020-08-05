@@ -10,7 +10,6 @@ __all__ = (
 
 import io
 import re
-import sys
 
 from portage import os
 from portage import _encodings, _unicode_encode
@@ -28,7 +27,7 @@ from _emerge.Blocker import Blocker
 from _emerge.Package import Package
 
 
-class _RepoDisplay(object):
+class _RepoDisplay:
 	def __init__(self, roots):
 		self._shown_repos = {}
 		self._unknown_repo = False
@@ -76,16 +75,8 @@ class _RepoDisplay(object):
 				" indicates that the source repository could not be determined\n")
 		return "".join(output)
 
-	if sys.hexversion < 0x3000000:
 
-		__unicode__ = __str__
-
-		def __str__(self):
-			return _unicode_encode(self.__unicode__(),
-				encoding=_encodings['content'])
-
-
-class _PackageCounters(object):
+class _PackageCounters:
 
 	def __init__(self):
 		self.upgrades   = 0
@@ -163,7 +154,7 @@ class _PackageCounters(object):
 		return "".join(myoutput)
 
 
-class _DisplayConfig(object):
+class _DisplayConfig:
 
 	def __init__(self, depgraph, mylist, favorites, verbosity):
 		frozen_config = depgraph._frozen_config
@@ -478,7 +469,7 @@ def _prune_tree_display(display_list):
 				del display_list[i]
 
 
-def _calc_changelog(ebuildpath,current,next):
+def _calc_changelog(ebuildpath,current,next): # pylint: disable=redefined-builtin
 	if ebuildpath == None or not os.path.exists(ebuildpath):
 		return []
 	current = '-'.join(catpkgsplit(current)[1:])
@@ -593,11 +584,11 @@ def _find_changelog_tags(changelog):
 		_strip_header_comments(changelog[release_end:].splitlines())))
 	return divs
 
-class PkgInfo(object):
+class PkgInfo:
 	"""Simple class to hold instance attributes for current
 	information about the pkg being printed.
 	"""
-	
+
 	__slots__ = ("attr_display", "built", "cp",
 		"ebuild_path", "fetch_symbol", "merge",
 		"oldbest", "oldbest_list", "operation", "ordered", "previous_pkg",
@@ -677,11 +668,3 @@ class PkgAttrDisplay(SlotObject):
 			output.append(self.mask)
 
 		return "".join(output)
-
-	if sys.hexversion < 0x3000000:
-
-		__unicode__ = __str__
-
-		def __str__(self):
-			return _unicode_encode(self.__unicode__(),
-				encoding=_encodings['content'])

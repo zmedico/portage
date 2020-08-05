@@ -1,4 +1,4 @@
-# Copyright 2007-2019 Gentoo Authors
+# Copyright 2007-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 from __future__ import print_function
@@ -29,17 +29,16 @@ SETPREFIX = "@"
 def get_boolean(options, name, default):
 	if not name in options:
 		return default
-	elif options[name].lower() in ("1", "yes", "on", "true"):
+	if options[name].lower() in ("1", "yes", "on", "true"):
 		return True
-	elif options[name].lower() in ("0", "no", "off", "false"):
+	if options[name].lower() in ("0", "no", "off", "false"):
 		return False
-	else:
-		raise SetConfigError(_("invalid value '%(value)s' for option '%(option)s'") % {"value": options[name], "option": name})
+	raise SetConfigError(_("invalid value '%(value)s' for option '%(option)s'") % {"value": options[name], "option": name})
 
 class SetConfigError(Exception):
 	pass
 
-class SetConfig(object):
+class SetConfig:
 	def __init__(self, paths, settings, trees):
 		self._parser = SafeConfigParser(
 			defaults={
@@ -151,12 +150,12 @@ class SetConfig(object):
 		if not setname in self.psets:
 			options["name"] = setname
 			options["world-candidate"] = "False"
-			
+
 			# for the unlikely case that there is already a section with the requested setname
 			import random
 			while setname in parser.sections():
 				setname = "%08d" % random.randint(0, 10**10)
-			
+
 			parser.add_section(setname)
 			for k, v in options.items():
 				parser.set(setname, k, v)
@@ -201,7 +200,7 @@ class SetConfig(object):
 			optdict = {}
 			for oname in parser.options(sname):
 				optdict[oname] = parser.get(sname, oname)
-			
+
 			# create single or multiple instances of the given class depending on configuration
 			if parser.has_option(sname, "multiset") and \
 				parser.getboolean(sname, "multiset"):
@@ -246,7 +245,7 @@ class SetConfig(object):
 						"must be configured as multiset") % {"class": classname, "section": sname})
 					continue
 		self._parsed = True
-	
+
 	def getSets(self):
 		self._parse()
 		return self.psets.copy()

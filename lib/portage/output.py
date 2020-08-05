@@ -1,4 +1,4 @@
-# Copyright 1998-2015 Gentoo Foundation
+# Copyright 1998-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 from __future__ import division
@@ -159,7 +159,7 @@ def _parse_color_map(config_root='/', onerror=None):
 	"""
 	global codes, _styles
 	myfile = os.path.join(config_root, COLOR_MAP_FILE)
-	ansi_code_pattern = re.compile("^[0-9;]*m$") 
+	ansi_code_pattern = re.compile("^[0-9;]*m$")
 	quotes = '\'"'
 	def strip_quotes(token):
 		if token[0] in quotes and token[0] == token[-1]:
@@ -174,10 +174,10 @@ def _parse_color_map(config_root='/', onerror=None):
 		for lineno, line in enumerate(lines):
 			commenter_pos = line.find("#")
 			line = line[:commenter_pos].strip()
-			
+
 			if len(line) == 0:
 				continue
-			
+
 			split_line = line.split("=")
 			if len(split_line) != 2:
 				e = ParseError(_("'%s', line %s: expected exactly one occurrence of '=' operator") % \
@@ -231,7 +231,7 @@ def _parse_color_map(config_root='/', onerror=None):
 		raise
 
 def nc_len(mystr):
-	tmp = re.sub(esc_seq + "^m]+m", "", mystr);
+	tmp = re.sub(esc_seq + "^m]+m", "", mystr)
 	return len(tmp)
 
 _legal_terms_re = re.compile(r'^(xterm|xterm-color|Eterm|aterm|rxvt|screen|kterm|rxvt-unicode|gnome|interix|tmux|st-256color|alacritty|konsole)')
@@ -256,9 +256,7 @@ def xtermTitle(mystr, raw=False):
 		# avoid potential UnicodeEncodeError
 		mystr = _unicode_encode(mystr,
 			encoding=_encodings['stdio'], errors='backslashreplace')
-		f = sys.stderr
-		if sys.hexversion >= 0x3000000:
-			f = f.buffer
+		f = sys.stderr.buffer
 		f.write(mystr)
 		f.flush()
 
@@ -336,12 +334,9 @@ def colorize(color_key, text):
 	if havecolor:
 		if color_key in codes:
 			return codes[color_key] + text + codes["reset"]
-		elif color_key in _styles:
+		if color_key in _styles:
 			return style_to_ansi_code(color_key) + text + codes["reset"]
-		else:
-			return text
-	else:
-		return text
+	return text
 
 compat_functions_colors = [
 	"bold", "white", "teal", "turquoise", "darkteal",
@@ -349,7 +344,7 @@ compat_functions_colors = [
 	"brown", "darkyellow", "red", "darkred",
 ]
 
-class create_color_func(object):
+class create_color_func:
 	__slots__ = ("_color_key",)
 	def __init__(self, color_key):
 		self._color_key = color_key
@@ -359,7 +354,7 @@ class create_color_func(object):
 for c in compat_functions_colors:
 	globals()[c] = create_color_func(c)
 
-class ConsoleStyleFile(object):
+class ConsoleStyleFile:
 	"""
 	A file-like object that behaves something like
 	the colorize() function. Style identifiers
@@ -398,8 +393,7 @@ class ConsoleStyleFile(object):
 		if f in (sys.stdout, sys.stderr):
 			s = _unicode_encode(s,
 				encoding=_encodings['stdio'], errors='backslashreplace')
-			if sys.hexversion >= 0x3000000:
-				f = f.buffer
+			f = f.buffer
 		f.write(s)
 
 	def writelines(self, lines):
@@ -485,7 +479,7 @@ def set_term_size(lines, columns, fd):
 	except CommandNotFound:
 		writemsg(_("portage: stty: command not found\n"), noiselevel=-1)
 
-class EOutput(object):
+class EOutput:
 	"""
 	Performs fancy terminal formatting for status and informational messages.
 
@@ -643,7 +637,7 @@ class EOutput(object):
 			self.__eend("ewend", errno, msg)
 		self.__last_e_cmd = "ewend"
 
-class ProgressBar(object):
+class ProgressBar:
 	"""The interface is copied from the ProgressBar class from the EasyDialogs
 	module (which is Mac only)."""
 	def __init__(self, title=None, maxval=0, label=None, max_desc_length=25):
@@ -755,6 +749,7 @@ class TermProgressBar(ProgressBar):
 		bar_space = cols - percentage_str_width - square_brackets_width - 1
 		if self._desc:
 			bar_space -= self._desc_max_length
+
 		if maxval == 0:
 			max_bar_width = bar_space-3
 			_percent = "".ljust(percentage_str_width)
@@ -779,19 +774,19 @@ class TermProgressBar(ProgressBar):
 				"[" + (bar_width * " ") + \
 				"<=>" + ((max_bar_width - bar_width) * " ") + "]")
 			return image
-		else:
-			percentage = 100 * curval // maxval
-			max_bar_width = bar_space - 1
-			_percent = ("%d%% " % percentage).rjust(percentage_str_width)
-			image = "%s%s" % (self._desc, _percent)
 
-			if cols < min_columns:
-				return image
-			offset = curval / maxval
-			bar_width = int(offset * max_bar_width)
-			image = image + "[" + (bar_width * "=") + \
-				">" + ((max_bar_width - bar_width) * " ") + "]"
+		percentage = 100 * curval // maxval
+		max_bar_width = bar_space - 1
+		_percent = ("%d%% " % percentage).rjust(percentage_str_width)
+		image = "%s%s" % (self._desc, _percent)
+
+		if cols < min_columns:
 			return image
+		offset = curval / maxval
+		bar_width = int(offset * max_bar_width)
+		image = image + "[" + (bar_width * "=") + \
+			">" + ((max_bar_width - bar_width) * " ") + "]"
+		return image
 
 _color_map_loaded = False
 

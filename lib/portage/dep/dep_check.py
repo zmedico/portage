@@ -19,7 +19,7 @@ from portage.localization import _
 from portage.util import writemsg, writemsg_level
 from portage.util.digraph import digraph
 from portage.util.SlotObject import SlotObject
-from portage.versions import vercmp, _pkg_str
+from portage.versions import vercmp
 
 def _expand_new_virtuals(mysplit, edebug, mydbapi, mysettings, myroot="/",
 	trees=None, use_mask=None, use_force=None, **kwargs):
@@ -283,14 +283,13 @@ def dep_eval(deplist):
 		if len(deplist) == 1:
 			return 1
 		return 0
-	else:
-		for x in deplist:
-			if isinstance(x, list):
-				if dep_eval(x)==0:
-					return 0
-			elif x==0 or x==2:
+	for x in deplist:
+		if isinstance(x, list):
+			if dep_eval(x)==0:
 				return 0
-		return 1
+		elif x==0 or x==2:
+			return 0
+	return 1
 
 class _dep_choice(SlotObject):
 	__slots__ = ('atoms', 'slot_map', 'cp_map', 'all_available',

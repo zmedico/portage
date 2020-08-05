@@ -5,12 +5,11 @@
 from portage.cache import cache_errors
 from portage.cache.cache_errors import InvalidRestriction
 from portage.cache.mappings import ProtectedDict
-import sys
 import warnings
 import operator
 
 
-class database(object):
+class database:
 	# this is for metadata/cache transfer.
 	# basically flags the cache needs be updated when transfered cache to cache.
 	# leave this.
@@ -30,7 +29,7 @@ class database(object):
 		self.readonly = readonly
 		self.sync_rate = 0
 		self.updates = 0
-	
+
 	def __getitem__(self, cpv):
 		"""set a cpv to values
 		This shouldn't be overriden in derived classes since it handles the __eclasses__ conversion.
@@ -171,18 +170,12 @@ class database(object):
 	def has_key(self, cpv):
 		return cpv in self
 
-	def keys(self):
-		return list(self)
-
 	def iterkeys(self):
 		return iter(self)
 
 	def iteritems(self):
 		for x in self:
 			yield (x, self[x])
-
-	def items(self):
-		return list(self.iteritems())
 
 	def sync(self, rate=0):
 		self.sync_rate = rate
@@ -262,7 +255,7 @@ class database(object):
 		"""generic function for walking the entire cache db, matching restrictions to
 		filter what cpv's are returned.  Derived classes should override this if they
 		can implement a faster method then pulling each cpv:values, and checking it.
-		
+
 		For example, RDBMS derived classes should push the matching logic down to the
 		actual RDBM."""
 
@@ -290,9 +283,9 @@ class database(object):
 			if cont:
 				yield cpv
 
-	if sys.hexversion >= 0x3000000:
-		keys = __iter__
-		items = iteritems
+	keys = __iter__
+	items = iteritems
+
 
 _keysorter = operator.itemgetter(0)
 

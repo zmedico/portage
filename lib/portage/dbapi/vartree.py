@@ -94,20 +94,15 @@ from itertools import chain
 import logging
 import os as _os
 import operator
+import pickle
 import platform
 import pwd
 import re
 import stat
-import sys
 import tempfile
 import textwrap
 import time
 import warnings
-
-try:
-	import cPickle as pickle
-except ImportError:
-	import pickle
 
 
 class vardbapi(dbapi):
@@ -437,10 +432,7 @@ class vardbapi(dbapi):
 		if mysplit[0] == '*':
 			mysplit[0] = mysplit[0][1:]
 		try:
-			if sys.hexversion >= 0x3030000:
-				mystat = os.stat(self.getpath(mysplit[0])).st_mtime_ns
-			else:
-				mystat = os.stat(self.getpath(mysplit[0])).st_mtime
+			mystat = os.stat(self.getpath(mysplit[0])).st_mtime_ns
 		except OSError:
 			mystat = 0
 		if use_cache and mycp in self.cpcache:
@@ -588,10 +580,7 @@ class vardbapi(dbapi):
 			return list(self._iter_match(mydep,
 				self.cp_list(mydep.cp, use_cache=use_cache)))
 		try:
-			if sys.hexversion >= 0x3030000:
-				curmtime = os.stat(os.path.join(self._eroot, VDB_PATH, mycat)).st_mtime_ns
-			else:
-				curmtime = os.stat(os.path.join(self._eroot, VDB_PATH, mycat)).st_mtime
+			curmtime = os.stat(os.path.join(self._eroot, VDB_PATH, mycat)).st_mtime_ns
 		except (IOError, OSError):
 			curmtime=0
 
@@ -1264,7 +1253,7 @@ class vardbapi(dbapi):
 		self._bump_mtime(pkg.mycpv)
 		pkg._clear_contents_cache()
 
-	class _owners_cache(object):
+	class _owners_cache:
 		"""
 		This class maintains an hash table that serves to index package
 		contents by mapping the basename of file to a list of possible
@@ -1330,7 +1319,7 @@ class vardbapi(dbapi):
 				counter = 0
 			return (str(cpv), counter, mtime)
 
-	class _owners_db(object):
+	class _owners_db:
 
 		def __init__(self, vardb):
 			self._vardb = vardb
@@ -1544,7 +1533,7 @@ class vardbapi(dbapi):
 				for result in search_future.result():
 					yield result
 
-class vartree(object):
+class vartree:
 	"this tree will scan a var/db/pkg database located at root (passed to init)"
 	def __init__(self, root=None, virtual=DeprecationWarning, categories=None,
 		settings=None):
@@ -1601,8 +1590,7 @@ class vartree(object):
 			use_cache=use_cache))
 		if mymatch is None:
 			return ""
-		else:
-			return mymatch
+		return mymatch
 
 	def dep_match(self, mydep, use_cache=1):
 		"compatibility method -- we want to see all matches, not just visible ones"
@@ -1610,8 +1598,7 @@ class vartree(object):
 		mymatch = self.dbapi.match(mydep, use_cache=use_cache)
 		if mymatch is None:
 			return []
-		else:
-			return mymatch
+		return mymatch
 
 	def exists_specific(self, cpv):
 		return self.dbapi.cpv_exists(cpv)
@@ -1640,13 +1627,12 @@ class vartree(object):
 	def populate(self):
 		self.populated=1
 
-class dblink(object):
+class dblink:
 	"""
 	This class provides an interface to the installed package database
 	At present this is implemented as a text backend in /var/db/pkg.
 	"""
 
-	import re
 	_normalize_needed = re.compile(r'//|^[^/]|./$|(^|/)\.\.?(/|$)')
 
 	_contents_re = re.compile(r'^(' + \
@@ -4946,10 +4932,7 @@ class dblink(object):
 			mymd5 = None
 			myto = None
 
-			if sys.hexversion >= 0x3030000:
-				mymtime = mystat.st_mtime_ns
-			else:
-				mymtime = mystat[stat.ST_MTIME]
+			mymtime = mystat.st_mtime_ns
 
 			if stat.S_ISREG(mymode):
 				mymd5 = perform_md5(mysrc, calc_prelink=calc_prelink)
@@ -5092,10 +5075,7 @@ class dblink(object):
 							% (relative_path, myabsto)])
 
 					showMessage("%s %s -> %s\n" % (zing, mydest, myto))
-					if sys.hexversion >= 0x3030000:
-						outfile.write("sym "+myrealdest+" -> "+myto+" "+str(mymtime // 1000000000)+"\n")
-					else:
-						outfile.write("sym "+myrealdest+" -> "+myto+" "+str(mymtime)+"\n")
+					outfile.write("sym "+myrealdest+" -> "+myto+" "+str(mymtime // 1000000000)+"\n")
 				else:
 					showMessage(_("!!! Failed to move file.\n"),
 						level=logging.ERROR, noiselevel=-1)
@@ -5244,10 +5224,7 @@ class dblink(object):
 						pass
 
 				if mymtime != None:
-					if sys.hexversion >= 0x3030000:
-						outfile.write("obj "+myrealdest+" "+mymd5+" "+str(mymtime // 1000000000)+"\n")
-					else:
-						outfile.write("obj "+myrealdest+" "+mymd5+" "+str(mymtime)+"\n")
+					outfile.write("obj "+myrealdest+" "+mymd5+" "+str(mymtime // 1000000000)+"\n")
 				showMessage("%s %s\n" % (zing,mydest))
 			else:
 				# we are merging a fifo or device node

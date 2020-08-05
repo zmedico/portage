@@ -1,13 +1,10 @@
 # Copyright 1999-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-import functools
-import sys
 from itertools import chain
 import warnings
 
 import portage
-from portage import _encodings, _unicode_decode, _unicode_encode
 from portage.cache.mappings import slot_dict_class
 from portage.const import EBUILD_PHASES
 from portage.dep import Atom, check_required_use, use_reduce, \
@@ -528,15 +525,7 @@ class Package(Task):
 		s += ")"
 		return s
 
-	if sys.hexversion < 0x3000000:
-
-		__unicode__ = __str__
-
-		def __str__(self):
-			return _unicode_encode(self.__unicode__(),
-				encoding=_encodings['content'])
-
-	class _use_class(object):
+	class _use_class:
 
 		__slots__ = ("enabled", "_expand", "_expand_hidden",
 			"_force", "_pkg", "_mask")
@@ -661,7 +650,7 @@ class Package(Task):
 
 		return use_str
 
-	class _iuse(object):
+	class _iuse:
 
 		__slots__ = ("__weakref__", "_iuse_implicit_match", "_pkg", "alias_mapping",
 			"all", "all_aliases", "enabled", "disabled", "tokens")
@@ -734,7 +723,8 @@ class Package(Task):
 			"""
 			if flag in self.all:
 				return flag
-			elif flag in self.all_aliases:
+
+			if flag in self.all_aliases:
 				for k, v in self.alias_mapping.items():
 					if flag in v:
 						return k

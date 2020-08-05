@@ -1,7 +1,6 @@
 # Copyright 1999-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-import sys
 
 from portage.dep import Atom, _repo_separator
 from portage.exception import InvalidData
@@ -122,4 +121,3 @@ def create_world_atom(pkg, args_set, root_config, before_install=False):
 				providers[0].cp == arg_atom.cp:
 				return None
 	return new_world_atom
-

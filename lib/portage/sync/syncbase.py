@@ -6,6 +6,7 @@ Base class for performing sync operations.
 This class contains common initialization code and functions.
 '''
 
+import functools
 import logging
 import os
 
@@ -19,7 +20,7 @@ from portage.util.futures.retry import retry
 from portage.util.futures.executor.fork import ForkExecutor
 from . import _SUBMODULE_PATH_MAP
 
-class SyncBase(object):
+class SyncBase:
 	'''Base Sync class for subclassing'''
 
 	short_desc = "Perform sync operations on repositories"

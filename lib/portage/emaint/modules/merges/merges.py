@@ -1,4 +1,4 @@
-# Copyright 2005-2014 Gentoo Foundation
+# Copyright 2005-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 import portage
@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 
-class TrackingFile(object):
+class TrackingFile:
 	"""File for keeping track of failed merges."""
 
 
@@ -80,7 +80,7 @@ class TrackingFile(object):
 		return self.load().items().__iter__()
 
 
-class MergesHandler(object):
+class MergesHandler:
 	"""Handle failed package merges."""
 
 	short_desc = "Remove failed merges"
@@ -93,7 +93,7 @@ class MergesHandler(object):
 	def __init__(self):
 		"""Create MergesHandler object."""
 		eroot = portage.settings['EROOT']
-		tracking_path = os.path.join(eroot, PRIVATE_PATH, 'failed-merges');
+		tracking_path = os.path.join(eroot, PRIVATE_PATH, 'failed-merges')
 		self._tracking_file = TrackingFile(tracking_path)
 		self._vardb_path = os.path.join(eroot, VDB_PATH)
 
@@ -224,9 +224,9 @@ class MergesHandler(object):
 		if output:
 			results.append(output)
 		if proc.returncode != os.EX_OK:
-			 emerge_status = "Failed to emerge '%s'" % (' '.join(pkg_atoms))
+			emerge_status = "Failed to emerge '%s'" % (' '.join(pkg_atoms))
 		else:
-			 emerge_status = "Successfully emerged '%s'" % (' '.join(pkg_atoms))
+			emerge_status = "Successfully emerged '%s'" % (' '.join(pkg_atoms))
 		results.append(emerge_status)
 		return results
 

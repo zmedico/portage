@@ -8,8 +8,8 @@ import sys
 import portage
 from portage import shutil, os
 from portage import _unicode_decode
-from portage.const import (BASH_BINARY, PORTAGE_BASE_PATH,
-	PORTAGE_PYM_PATH, USER_CONFIG_PATH, SUPPORTED_GENTOO_BINPKG_FORMATS)
+from portage.const import (BASH_BINARY, PORTAGE_PYM_PATH, USER_CONFIG_PATH,
+	SUPPORTED_GENTOO_BINPKG_FORMATS)
 from portage.cache.mappings import Mapping
 from portage.process import find_binary
 from portage.tests import TestCase
@@ -360,7 +360,7 @@ call_has_and_best_version() {
 			emerge_cmd + ("--oneshot", "--usepkg", "dev-libs/B",),
 
 			# trigger clean prior to pkg_pretend as in bug #390711
-			ebuild_cmd + (test_ebuild, "unpack"), 
+			ebuild_cmd + (test_ebuild, "unpack"),
 			emerge_cmd + ("--oneshot", "dev-libs/A",),
 
 			emerge_cmd + ("--noreplace", "dev-libs/A",),

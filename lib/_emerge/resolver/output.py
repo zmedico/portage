@@ -8,9 +8,6 @@ __all__ = (
 	"Display", "format_unmatched_atom",
 	)
 
-import sys
-
-import portage
 from portage import os
 from portage.dbapi.dep_expand import dep_expand
 from portage.dep import Atom, cpvequal, _repo_separator, _slot_separator
@@ -32,7 +29,7 @@ from _emerge.resolver.output_helpers import ( _DisplayConfig, _tree_display,
 	_PackageCounters, _create_use_string, _calc_changelog, PkgInfo)
 from _emerge.show_invalid_depstring_notice import show_invalid_depstring_notice
 
-class Display(object):
+class Display:
 	"""Formats and outputs the depgrah supplied it for merge/re-merge, etc.
 
 	__call__()
@@ -261,26 +258,24 @@ class Display(object):
 			if pkg_info.built:
 				if pkg_info.system:
 					return colorize("PKG_BINARY_MERGE_SYSTEM", pkg_str)
-				elif pkg_info.world:
+				if pkg_info.world:
 					return colorize("PKG_BINARY_MERGE_WORLD", pkg_str)
-				else:
-					return colorize("PKG_BINARY_MERGE", pkg_str)
-			else:
-				if pkg_info.system:
-					return colorize("PKG_MERGE_SYSTEM", pkg_str)
-				elif pkg_info.world:
-					return colorize("PKG_MERGE_WORLD", pkg_str)
-				else:
-					return colorize("PKG_MERGE", pkg_str)
-		elif pkg_info.operation == "uninstall":
-			return colorize("PKG_UNINSTALL", pkg_str)
-		else:
+				return colorize("PKG_BINARY_MERGE", pkg_str)
+
 			if pkg_info.system:
-				return colorize("PKG_NOMERGE_SYSTEM", pkg_str)
-			elif pkg_info.world:
-				return colorize("PKG_NOMERGE_WORLD", pkg_str)
-			else:
-				return colorize("PKG_NOMERGE", pkg_str)
+				return colorize("PKG_MERGE_SYSTEM", pkg_str)
+			if pkg_info.world:
+				return colorize("PKG_MERGE_WORLD", pkg_str)
+			return colorize("PKG_MERGE", pkg_str)
+
+		if pkg_info.operation == "uninstall":
+			return colorize("PKG_UNINSTALL", pkg_str)
+
+		if pkg_info.system:
+			return colorize("PKG_NOMERGE_SYSTEM", pkg_str)
+		if pkg_info.world:
+			return colorize("PKG_NOMERGE_WORLD", pkg_str)
+		return colorize("PKG_NOMERGE", pkg_str)
 
 
 	def verbose_size(self, pkg, repoadd_set, pkg_info):

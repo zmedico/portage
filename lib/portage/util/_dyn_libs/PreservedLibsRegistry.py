@@ -4,13 +4,8 @@
 import errno
 import json
 import logging
+import pickle
 import stat
-import sys
-
-try:
-	import cPickle as pickle
-except ImportError:
-	import pickle
 
 from portage import abssymlink
 from portage import os
@@ -26,7 +21,7 @@ from portage.versions import cpv_getkey
 from portage.locks import lockfile, unlockfile
 
 
-class PreservedLibsRegistry(object):
+class PreservedLibsRegistry:
 	""" This class handles the tracking of preserved library objects """
 
 	# JSON read support has been available since portage-2.2.0_alpha89.
@@ -35,14 +30,11 @@ class PreservedLibsRegistry(object):
 	_json_write_opts = {
 		"ensure_ascii": False,
 		"indent": "\t",
-		"sort_keys": True
+		"sort_keys": True,
 	}
-	if sys.hexversion < 0x30200F0:
-		# indent only supports int number of spaces
-		_json_write_opts["indent"] = 4
 
 	def __init__(self, root, filename):
-		""" 
+		"""
 			@param root: root used to check existence of paths in pruneNonExisting
 		    @type root: String
 			@param filename: absolute path for saving the preserved libs records
@@ -157,7 +149,7 @@ class PreservedLibsRegistry(object):
 
 	def register(self, cpv, slot, counter, paths):
 		""" Register new objects in the registry. If there is a record with the
-			same packagename (internally derived from cpv) and slot it is 
+			same packagename (internally derived from cpv) and slot it is
 			overwritten with the new data.
 			@param cpv: package instance that owns the objects
 			@type cpv: CPV (as String)
@@ -189,7 +181,7 @@ class PreservedLibsRegistry(object):
 			@type slot: String
 		"""
 		self.register(cpv, slot, counter, [])
-	
+
 	def pruneNonExisting(self):
 		""" Remove all records for objects that no longer exist on the filesystem. """
 
@@ -232,13 +224,13 @@ class PreservedLibsRegistry(object):
 				self._data[cps] = (cpv, counter, paths)
 			else:
 				del self._data[cps]
-	
+
 	def hasEntries(self):
 		""" Check if this registry contains any records. """
 		if self._data is None:
 			self.load()
 		return len(self._data) > 0
-	
+
 	def getPreservedLibs(self):
 		""" Return a mapping of packages->preserved objects.
 			@return mapping of package instances to preserved objects

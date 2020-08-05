@@ -1,17 +1,13 @@
-# Copyright 2012-2013 Gentoo Foundation
+# Copyright 2012-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-import io
 import re
 import subprocess
 import sys
 
-import portage
-from portage import _encodings, _unicode_encode, _unicode_decode
+from portage import _unicode_encode, _unicode_decode
 from portage.util import writemsg
-from portage.util.configparser import (ConfigParserError, RawConfigParser,
-	read_configs)
-
+from portage.util.configparser import (RawConfigParser,	read_configs)
 
 def parse_desktop_entry(path):
 	"""
@@ -25,7 +21,12 @@ def parse_desktop_entry(path):
 
 	return parser
 
-_trivial_warnings = re.compile(r' looks redundant with value ')
+_trivial_warnings = re.compile(r' looks '
+	# >=desktop-file-utils-0.25
+	r'(?:the same as that of key|'
+
+	# <desktop-file-utils-0.25
+	r'redundant with value) ')
 
 _ignored_errors = (
 		# Ignore error for emacs.desktop:

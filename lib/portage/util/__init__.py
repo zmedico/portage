@@ -14,10 +14,7 @@ __all__ = ['apply_permissions', 'apply_recursive_permissions',
 from copy import deepcopy
 import errno
 import io
-try:
-	from itertools import chain, filterfalse
-except ImportError:
-	from itertools import chain, ifilterfalse as filterfalse
+from itertools import chain, filterfalse
 import logging
 import re
 import shlex
@@ -72,7 +69,7 @@ def writemsg(mystr, noiselevel=0, fd=None):
 		else:
 			mystr = _unicode_encode(mystr,
 				encoding=_encodings['stdio'], errors='backslashreplace')
-			if sys.hexversion >= 0x3000000 and fd in (sys.stdout, sys.stderr):
+			if fd in (sys.stdout, sys.stderr):
 				fd = fd.buffer
 		fd.write(mystr)
 		fd.flush()
@@ -107,7 +104,7 @@ def normalize_path(mypath):
 	We dislike this behavior so we create our own normpath func
 	to fix it.
 	"""
-	if sys.hexversion >= 0x3000000 and isinstance(mypath, bytes):
+	if isinstance(mypath, bytes):
 		path_sep = os.path.sep.encode()
 	else:
 		path_sep = os.path.sep
@@ -115,8 +112,7 @@ def normalize_path(mypath):
 	if mypath.startswith(path_sep):
 		# posixpath.normpath collapses 3 or more leading slashes to just 1.
 		return os.path.normpath(2*path_sep + mypath)
-	else:
-		return os.path.normpath(mypath)
+	return os.path.normpath(mypath)
 
 def grabfile(myfilename, compat_level=0, recursive=0, remember_source_file=False):
 	"""This function grabs the lines in a file, normalizes whitespace and returns lines in a list; if a line
@@ -252,9 +248,9 @@ def append_repo(atom_list, repo_name, remember_source_file=False):
 	if remember_source_file:
 		return [(atom.repo is not None and atom or atom.with_repo(repo_name), source) \
 			for atom, source in atom_list]
-	else:
-		return [atom.repo is not None and atom or atom.with_repo(repo_name) \
-			for atom in atom_list]
+
+	return [atom.repo is not None and atom or atom.with_repo(repo_name) \
+		for atom in atom_list]
 
 def stack_lists(lists, incremental=1, remember_source_file=False,
 	warn_for_unmatched_removal=False, strict_warn_for_unmatched_removal=False, ignore_repo=False):
@@ -331,8 +327,7 @@ def stack_lists(lists, incremental=1, remember_source_file=False,
 
 	if remember_source_file:
 		return list(new_list.items())
-	else:
-		return list(new_list)
+	return list(new_list)
 
 def grabdict(myfilename, juststrings=0, empty=0, recursive=0, incremental=1, newlines=0):
 	"""
@@ -591,19 +586,15 @@ def writedict(mydict, myfilename, writekey=True):
 			lines.append("%s %s\n" % (k, " ".join(v)))
 	write_atomic(myfilename, "".join(lines))
 
+
 def shlex_split(s):
 	"""
 	This is equivalent to shlex.split, but if the current interpreter is
 	python2, it temporarily encodes unicode strings to bytes since python2's
 	shlex.split() doesn't handle unicode strings.
 	"""
-	convert_to_bytes = sys.hexversion < 0x3000000 and not isinstance(s, bytes)
-	if convert_to_bytes:
-		s = _unicode_encode(s)
-	rval = shlex.split(s)
-	if convert_to_bytes:
-		rval = [_unicode_decode(x) for x in rval]
-	return rval
+	return shlex.split(s)
+
 
 class _getconfig_shlex(shlex.shlex):
 
@@ -668,15 +659,9 @@ def getconfig(mycfg, tolerant=False, allow_sourcing=False, expand=True,
 
 	f = None
 	try:
-		# NOTE: shlex doesn't support unicode objects with Python 2
-		# (produces spurious \0 characters).
-		if sys.hexversion < 0x3000000:
-			f = open(_unicode_encode(mycfg,
-				encoding=_encodings['fs'], errors='strict'), 'rb')
-		else:
-			f = open(_unicode_encode(mycfg,
-				encoding=_encodings['fs'], errors='strict'), mode='r',
-				encoding=_encodings['content'], errors='replace')
+		f = open(_unicode_encode(mycfg,
+			encoding=_encodings['fs'], errors='strict'), mode='r',
+			encoding=_encodings['content'], errors='replace')
 		content = f.read()
 	except IOError as e:
 		if e.errno == PermissionDenied.errno:
@@ -881,9 +866,8 @@ def varexpand(mystring, mydict=None, error_leader=None):
 								msg = error_leader() + msg
 							writemsg(msg + "\n", noiselevel=-1)
 							return ""
-						else:
-							pos += 1
-							break
+						pos += 1
+						break
 					pos += 1
 				myvarname = mystring[myvstart:pos]
 				if braced:
@@ -893,8 +877,7 @@ def varexpand(mystring, mydict=None, error_leader=None):
 							msg = error_leader() + msg
 						writemsg(msg + "\n", noiselevel=-1)
 						return ""
-					else:
-						pos += 1
+					pos += 1
 				if len(myvarname) == 0:
 					msg = "$"
 					if braced:
@@ -955,7 +938,7 @@ def dump_traceback(msg, noiselevel=1):
 		writemsg(error+"\n", noiselevel=noiselevel)
 	writemsg("====================================\n\n", noiselevel=noiselevel)
 
-class cmp_sort_key(object):
+class cmp_sort_key:
 	"""
 	In python-3.0 the list.sort() method no longer has a "cmp" keyword
 	argument. This class acts as an adapter which converts a cmp function
@@ -979,7 +962,7 @@ class cmp_sort_key(object):
 	def __call__(self, lhs):
 		return self._cmp_key(self._cmp_func, lhs)
 
-	class _cmp_key(object):
+	class _cmp_key:
 		__slots__ = ("_cmp_func", "_obj")
 
 		def __init__(self, cmp_func, obj):
@@ -1050,18 +1033,16 @@ def _do_stat(filename, follow_links=True):
 	try:
 		if follow_links:
 			return os.stat(filename)
-		else:
-			return os.lstat(filename)
+		return os.lstat(filename)
 	except OSError as oe:
 		func_call = "stat('%s')" % filename
 		if oe.errno == errno.EPERM:
 			raise OperationNotPermitted(func_call)
-		elif oe.errno == errno.EACCES:
+		if oe.errno == errno.EACCES:
 			raise PermissionDenied(func_call)
-		elif oe.errno == errno.ENOENT:
+		if oe.errno == errno.ENOENT:
 			raise FileNotFound(filename)
-		else:
-			raise
+		raise
 
 def apply_permissions(filename, uid=-1, gid=-1, mode=-1, mask=-1,
 	stat_cached=None, follow_links=True):
@@ -1309,29 +1290,10 @@ class atomic_ofstream(ObjectProxy):
 	def _get_target(self):
 		return object.__getattribute__(self, '_file')
 
-	if sys.hexversion >= 0x3000000:
-
-		def __getattribute__(self, attr):
-			if attr in ('close', 'abort', '__del__'):
-				return object.__getattribute__(self, attr)
-			return getattr(object.__getattribute__(self, '_file'), attr)
-
-	else:
-
-		# For TextIOWrapper, automatically coerce write calls to
-		# unicode, in order to avoid TypeError when writing raw
-		# bytes with python2.
-
-		def __getattribute__(self, attr):
-			if attr in ('close', 'abort', 'write', '__del__'):
-				return object.__getattribute__(self, attr)
-			return getattr(object.__getattribute__(self, '_file'), attr)
-
-		def write(self, s):
-			f = object.__getattribute__(self, '_file')
-			if isinstance(f, io.TextIOWrapper):
-				s = _unicode_decode(s)
-			return f.write(s)
+	def __getattribute__(self, attr):
+		if attr in ('close', 'abort', '__del__'):
+			return object.__getattribute__(self, attr)
+		return getattr(object.__getattribute__(self, '_file'), attr)
 
 	def close(self):
 		"""Closes the temporary file, copies permissions (if possible),
@@ -1512,8 +1474,7 @@ class LazyItemsDict(UserDict):
 				self[item_key] = result
 			return result
 
-		else:
-			return UserDict.__getitem__(self, item_key)
+		return UserDict.__getitem__(self, item_key)
 
 	def __setitem__(self, item_key, value):
 		if item_key in self.lazy_items:
@@ -1557,7 +1518,7 @@ class LazyItemsDict(UserDict):
 			UserDict.__setitem__(result, k_copy, deepcopy(self[k], memo))
 		return result
 
-	class _LazyItem(object):
+	class _LazyItem:
 
 		__slots__ = ('func', 'pargs', 'kwargs', 'singleton')
 
@@ -1592,7 +1553,7 @@ class LazyItemsDict(UserDict):
 			result.singleton = deepcopy(self.singleton, memo)
 			return result
 
-class ConfigProtect(object):
+class ConfigProtect:
 	def __init__(self, myroot, protect_list, mask_list,
 		case_insensitive=False):
 		self.myroot = myroot

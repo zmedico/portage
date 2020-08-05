@@ -1,12 +1,10 @@
-# Copyright 2010-2013 Gentoo Foundation
+# Copyright 2010-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 __all__ = ["cpv_expand"]
 
 import portage
 from portage.exception import AmbiguousPackageName
-from portage.localization import _
-from portage.util import writemsg
 from portage.versions import _pkgsplit
 
 def cpv_expand(mycpv, mydb=None, use_cache=1, settings=None):
@@ -100,7 +98,5 @@ def cpv_expand(mycpv, mydb=None, use_cache=1, settings=None):
 	if mysplit:
 		if mysplit[2]=="r0":
 			return mykey+"-"+mysplit[1]
-		else:
-			return mykey+"-"+mysplit[1]+"-"+mysplit[2]
-	else:
-		return mykey
+		return mykey+"-"+mysplit[1]+"-"+mysplit[2]
+	return mykey

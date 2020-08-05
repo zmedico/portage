@@ -1,5 +1,5 @@
 # portage.py -- core Portage functionality
-# Copyright 1998-2019 Gentoo Authors
+# Copyright 1998-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 
@@ -107,7 +107,7 @@ def sanitize_fds():
 	if _set_inheritable is not None:
 
 		whitelist = frozenset([
-			sys.__stdin__.fileno(),
+			portage._get_stdin().fileno(),
 			sys.__stdout__.fileno(),
 			sys.__stderr__.fileno(),
 		])
@@ -123,7 +123,7 @@ def sanitize_fds():
 def spawn_bash(mycommand, debug=False, opt_name=None, **keywords):
 	"""
 	Spawns a bash shell running a specific commands
-	
+
 	@param mycommand: The command for bash to run
 	@type mycommand: String
 	@param debug: Turn bash debugging on (set -x)
@@ -198,10 +198,7 @@ def run_exitfuncs():
 			exc_info = sys.exc_info()
 
 	if exc_info is not None:
-		if sys.hexversion >= 0x3000000:
-			raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
-		else:
-			exec("raise exc_info[0], exc_info[1], exc_info[2]")
+		raise exc_info[0](exc_info[1]).with_traceback(exc_info[2])
 
 atexit.register(run_exitfuncs)
 
@@ -226,12 +223,12 @@ def cleanup():
 def spawn(mycommand, env=None, opt_name=None, fd_pipes=None, returnpid=False,
           uid=None, gid=None, groups=None, umask=None, cwd=None, logfile=None,
           path_lookup=True, pre_exec=None,
-          close_fds=(sys.version_info < (3, 4)), unshare_net=False,
+          close_fds=False, unshare_net=False,
           unshare_ipc=False, unshare_mount=False, unshare_pid=False,
 	  cgroup=None):
 	"""
 	Spawns a given command.
-	
+
 	@param mycommand: the command to execute
 	@type mycommand: String or List (Popen style list)
 	@param env: If env is not None, it must be a mapping that defines the environment
@@ -280,7 +277,7 @@ def spawn(mycommand, env=None, opt_name=None, fd_pipes=None, returnpid=False,
 
 	logfile requires stdout and stderr to be assigned to this process (ie not pointed
 	   somewhere else.)
-	
+
 	"""
 
 	# mycommand is either a str or a list
@@ -288,15 +285,6 @@ def spawn(mycommand, env=None, opt_name=None, fd_pipes=None, returnpid=False,
 		mycommand = mycommand.split()
 
 	env = os.environ if env is None else env
-
-	if sys.hexversion < 0x3000000:
-		# Avoid a potential UnicodeEncodeError from os.execve().
-		env_bytes = {}
-		for k, v in env.items():
-			env_bytes[_unicode_encode(k, encoding=_encodings['content'])] = \
-				_unicode_encode(v, encoding=_encodings['content'])
-		env = env_bytes
-		del env_bytes
 
 	# If an absolute path to an executable file isn't given
 	# search for it unless we've been told not to.
@@ -528,7 +516,7 @@ def _exec(binary, mycommand, opt_name, fd_pipes,
 
 	"""
 	Execute a given binary with options
-	
+
 	@param binary: Name of program to execute
 	@type binary: String
 	@param mycommand: Options for program
@@ -749,7 +737,7 @@ def _exec(binary, mycommand, opt_name, fd_pipes,
 	os.execve(binary, myargs, env)
 
 
-class _unshare_validator(object):
+class _unshare_validator:
 	"""
 	In order to prevent failed unshare calls from corrupting the state
 	of an essential process, validate the relevant unshare call in a
@@ -957,14 +945,14 @@ def _setup_pipes(fd_pipes, close_fds=True, inheritable=None):
 def find_binary(binary):
 	"""
 	Given a binary name, find the binary in PATH
-	
+
 	@param binary: Name of the binary to find
 	@type string
 	@rtype: None or string
 	@return: full path to binary or None if the binary could not be located.
 	"""
 	paths = os.environ.get("PATH", "")
-	if sys.hexversion >= 0x3000000 and isinstance(binary, bytes):
+	if isinstance(binary, bytes):
 		# return bytes when input is bytes
 		paths = paths.encode(sys.getfilesystemencoding(), 'surrogateescape')
 		paths = paths.split(b':')

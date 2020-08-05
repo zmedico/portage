@@ -4,16 +4,11 @@
 from __future__ import division, print_function
 
 import collections
-import errno
 import logging
 import operator
 import platform
-import pwd
-import random
 import re
 import signal
-import socket
-import stat
 import subprocess
 import sys
 import tempfile
@@ -31,16 +26,15 @@ portage.proxy.lazyimport.lazyimport(globals(),
 	'portage.util.locale:check_locale',
 	'portage.emaint.modules.sync.sync:SyncRepos',
 	'_emerge.chk_updated_cfg_files:chk_updated_cfg_files',
-	'_emerge.help:help@emerge_help',
+	'_emerge.help:emerge_help',
 	'_emerge.post_emerge:display_news_notification,post_emerge',
 	'_emerge.stdout_spinner:stdout_spinner',
 )
 
 from portage import os
 from portage import shutil
-from portage import eapi_is_supported, _encodings, _unicode_decode
-from portage.cache.cache_errors import CacheError
-from portage.const import GLOBAL_CONFIG_PATH, VCS_DIRS, _DEPCLEAN_LIB_CHECK_DEFAULT
+from portage import _encodings, _unicode_decode
+from portage.const import _DEPCLEAN_LIB_CHECK_DEFAULT
 from portage.const import SUPPORTED_BINPKG_FORMATS, SUPPORTED_XPAK_EXTENSIONS, \
 	SUPPORTED_GPKG_EXTENSIONS, TIMESTAMP_FORMAT
 from portage.dbapi.dep_expand import dep_expand
@@ -48,15 +42,13 @@ from portage.dbapi._expand_new_virt import expand_new_virt
 from portage.dbapi.IndexedPortdb import IndexedPortdb
 from portage.dbapi.IndexedVardb import IndexedVardb
 from portage.dep import Atom, _repo_separator, _slot_separator
-from portage.eclass_cache import hashed_path
 from portage.exception import InvalidAtom, InvalidData, ParseError, GPGException
-from portage.output import blue, colorize, create_color_func, darkgreen, \
-	red, xtermTitle, xtermTitleReset, yellow
+from portage.output import colorize, create_color_func, darkgreen, \
+	red, xtermTitle, xtermTitleReset
 good = create_color_func("GOOD")
 bad = create_color_func("BAD")
 warn = create_color_func("WARN")
 from portage.package.ebuild._ipc.QueryCommand import QueryCommand
-from portage.package.ebuild.doebuild import _check_temp_dir
 from portage.package.ebuild.fetch import _hide_url_passwd
 from portage._sets import load_default_config, SETPREFIX
 from portage._sets.base import InternalPackageSet
@@ -75,17 +67,14 @@ from portage.emaint.main import print_results
 from portage.gpg import GPG
 
 from _emerge.clear_caches import clear_caches
-from _emerge.countdown import countdown
 from _emerge.create_depgraph_params import create_depgraph_params
 from _emerge.Dependency import Dependency
 from _emerge.depgraph import backtrack_depgraph, depgraph, resume_depgraph
-from _emerge.DepPrioritySatisfiedRange import DepPrioritySatisfiedRange
 from _emerge.emergelog import emergelog
 from _emerge.is_valid_package_atom import is_valid_package_atom
 from _emerge.main import profile_check
 from _emerge.MetadataRegen import MetadataRegen
 from _emerge.Package import Package
-from _emerge.ProgressHandler import ProgressHandler
 from _emerge.RootConfig import RootConfig
 from _emerge.Scheduler import Scheduler
 from _emerge.search import search
@@ -1094,10 +1083,9 @@ def _calc_depclean(settings, trees, ldpath_mtimes,
 		"""Sort Package instances by cpv."""
 		if pkg1.cpv > pkg2.cpv:
 			return 1
-		elif pkg1.cpv == pkg2.cpv:
+		if pkg1.cpv == pkg2.cpv:
 			return 0
-		else:
-			return -1
+		return -1
 
 	def create_cleanlist():
 
@@ -1575,7 +1563,7 @@ def action_deselect(settings, trees, opts, atoms):
 			world_set.unlock()
 	return os.EX_OK
 
-class _info_pkgs_ver(object):
+class _info_pkgs_ver:
 	def __init__(self, ver, repo_suffix, provide_suffix):
 		self.ver = ver
 		self.repo_suffix = repo_suffix
@@ -3013,7 +3001,7 @@ def run_action(emerge_config):
 			emerge_config.target_config.trees['vartree'].dbapi) + '\n',
 			noiselevel=-1)
 		return 0
-	elif emerge_config.action == 'help':
+	if emerge_config.action == 'help':
 		emerge_help()
 		return 0
 
@@ -3047,7 +3035,7 @@ def run_action(emerge_config):
 		writemsg_stdout("".join("%s\n" % s for s in
 			sorted(emerge_config.target_config.sets)))
 		return os.EX_OK
-	elif emerge_config.action == "check-news":
+	if emerge_config.action == "check-news":
 		news_counts = count_unread_news(
 			emerge_config.target_config.trees["porttree"].dbapi,
 			emerge_config.target_config.trees["vartree"].dbapi)
@@ -3219,8 +3207,6 @@ def run_action(emerge_config):
 
 	if not "--pretend" in emerge_config.opts:
 		time_fmt = "%b %d, %Y %H:%M:%S"
-		if sys.hexversion < 0x3000000:
-			time_fmt = portage._unicode_encode(time_fmt)
 		time_str = time.strftime(time_fmt, time.localtime(time.time()))
 		# Avoid potential UnicodeDecodeError in Python 2, since strftime
 		# returns bytes in Python 2, and %b may contain non-ascii chars.
@@ -3272,7 +3258,7 @@ def run_action(emerge_config):
 
 	if "sync" == emerge_config.action:
 		return action_sync(emerge_config)
-	elif "metadata" == emerge_config.action:
+	if "metadata" == emerge_config.action:
 		action_metadata(emerge_config.target_config.settings,
 			emerge_config.target_config.trees['porttree'].dbapi,
 			emerge_config.opts)

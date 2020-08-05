@@ -84,7 +84,7 @@ def _get_lock_fn():
 _open_fds = {}
 _open_inodes = {}
 
-class _lock_manager(object):
+class _lock_manager:
 	__slots__ = ('fd', 'inode_key')
 	def __init__(self, fd, fstat_result, path):
 		self.fd = fd
@@ -215,14 +215,13 @@ def _lockfile_iteration(mypath, wantnewlockfile=False, unlinkfile=False,
 					if e.errno in (errno.ENOENT, errno.ESTALE):
 						os.close(myfd)
 						return None
-					else:
-						writemsg("%s: chown('%s', -1, %d)\n" % \
-							(e, lockfilename, portage_gid), noiselevel=-1)
-						writemsg(_("Cannot chown a lockfile: '%s'\n") % \
-							lockfilename, noiselevel=-1)
-						writemsg(_("Group IDs of current user: %s\n") % \
-							" ".join(str(n) for n in os.getgroups()),
-							noiselevel=-1)
+					writemsg("%s: chown('%s', -1, %d)\n" % \
+						(e, lockfilename, portage_gid), noiselevel=-1)
+					writemsg(_("Cannot chown a lockfile: '%s'\n") % \
+						lockfilename, noiselevel=-1)
+					writemsg(_("Group IDs of current user: %s\n") % \
+						" ".join(str(n) for n in os.getgroups()),
+						noiselevel=-1)
 		finally:
 			os.umask(old_mask)
 
@@ -330,17 +329,6 @@ def _lockfile_iteration(mypath, wantnewlockfile=False, unlinkfile=False,
 				return None
 
 	if myfd != HARDLINK_FD:
-
-		# FD_CLOEXEC is enabled by default in Python >=3.4.
-		if sys.hexversion < 0x3040000:
-			try:
-				fcntl.FD_CLOEXEC
-			except AttributeError:
-				pass
-			else:
-				fcntl.fcntl(myfd, fcntl.F_SETFD,
-					fcntl.fcntl(myfd, fcntl.F_GETFD) | fcntl.FD_CLOEXEC)
-
 		_lock_manager(myfd, os.fstat(myfd) if fstat_result is None else fstat_result, mypath)
 
 	writemsg(str((lockfilename, myfd, unlinkfile)) + "\n", 1)
@@ -456,7 +444,7 @@ def unlockfile(mytuple):
 	if(myfd == HARDLINK_FD):
 		unhardlink_lockfile(lockfilename, unlinkfile=unlinkfile)
 		return True
-	
+
 	# myfd may be None here due to myfd = mypath in lockfile()
 	if isinstance(lockfilename, str) and \
 		not os.path.exists(lockfilename):
@@ -684,7 +672,7 @@ def hardlock_cleanup(path, remove_all_locks=False):
 				hostpid  = parts[1].split("-")
 				host  = "-".join(hostpid[:-1])
 				pid   = hostpid[-1]
-				
+
 				if filename not in mylist:
 					mylist[filename] = {}
 				if host not in mylist[filename]:
@@ -695,7 +683,7 @@ def hardlock_cleanup(path, remove_all_locks=False):
 
 
 	results.append(_("Found %(count)s locks") % {"count": mycount})
-	
+
 	for x in mylist:
 		if myhost in mylist[x] or remove_all_locks:
 			mylockname = hardlock_name(path + "/" + x)
@@ -728,4 +716,3 @@ def hardlock_cleanup(path, remove_all_locks=False):
 					pass
 
 	return results
-

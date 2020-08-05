@@ -2,15 +2,14 @@
 # Distributed under the terms of the GNU General Public License v2
 
 import bz2
-from itertools import permutations
 import fnmatch
-import sys
 import tempfile
 import portage
+
+from itertools import permutations
 from portage import os
 from portage import shutil
-from portage.const import (GLOBAL_CONFIG_PATH, PORTAGE_BASE_PATH,
-	USER_CONFIG_PATH)
+from portage.const import (GLOBAL_CONFIG_PATH, USER_CONFIG_PATH)
 from portage.process import find_binary
 from portage.dep import Atom, _repo_separator
 from portage.package.ebuild.config import config
@@ -37,7 +36,7 @@ except ImportError:
 	cnf_path_repoman = None
 
 
-class ResolverPlayground(object):
+class ResolverPlayground:
 	"""
 	This class helps to create the necessary files on disk and
 	the needed settings instances, etc. for the resolver to do
@@ -684,7 +683,7 @@ class ResolverPlayground(object):
 		else:
 			shutil.rmtree(self.eroot)
 
-class ResolverPlaygroundTestCase(object):
+class ResolverPlaygroundTestCase:
 
 	def __init__(self, request, **kwargs):
 		self.all_permutations = kwargs.pop("all_permutations", False)
@@ -862,7 +861,7 @@ def _mergelist_str(x, depgraph):
 	return mergelist_str
 
 
-class ResolverPlaygroundResult(object):
+class ResolverPlaygroundResult:
 
 	checks = (
 		"success", "mergelist", "use_changes", "license_changes",
@@ -956,7 +955,7 @@ class ResolverPlaygroundResult(object):
 		if required_use_unsatisfied:
 			self.required_use_unsatisfied = set(required_use_unsatisfied)
 
-class ResolverPlaygroundDepcleanResult(object):
+class ResolverPlaygroundDepcleanResult:
 
 	checks = (
 		"success", "cleanlist", "ordered", "req_pkg_count",

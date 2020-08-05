@@ -1,13 +1,12 @@
 # Copyright 2006-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
-import sys
 from portage.tests import TestCase
 from portage.dep import Atom, match_from_list, _repo_separator
 from portage.versions import catpkgsplit, _pkg_str
 
 
-class Package(object):
+class Package:
 	"""
 	Provides a minimal subset of attributes of _emerge.Package.Package
 	"""
@@ -31,11 +30,11 @@ class Package(object):
 			self.use = self._use_class([])
 			self.iuse = self._iuse_class([])
 
-	class _use_class(object):
+	class _use_class:
 		def __init__(self, use):
 			self.enabled = frozenset(use)
 
-	class _iuse_class(object):
+	class _iuse_class:
 		def __init__(self, iuse):
 			self.all = frozenset(iuse)
 

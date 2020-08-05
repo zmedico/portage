@@ -30,7 +30,6 @@
 
 __all__ = ('MetaDataXML', 'parse_metadata_use')
 
-import sys
 
 try:
 	import xml.etree.cElementTree as etree
@@ -62,7 +61,7 @@ class _MetadataTreeBuilder(xml.etree.ElementTree.TreeBuilder):
 	def doctype(self, name, pubid, system):
 		pass
 
-class _Maintainer(object):
+class _Maintainer:
 	"""An object for representing one maintainer.
 
 	@type email: str or None
@@ -95,7 +94,7 @@ class _Maintainer(object):
 		return "<%s %r>" % (self.__class__.__name__, self.email)
 
 
-class _Useflag(object):
+class _Useflag:
 	"""An object for representing one USE flag.
 
 	@todo: Is there any way to have a keyword option to leave in
@@ -125,7 +124,7 @@ class _Useflag(object):
 		return "<%s %r>" % (self.__class__.__name__, self.name)
 
 
-class _Upstream(object):
+class _Upstream:
 	"""An object for representing one package's upstream.
 
 	@type maintainers: list
@@ -181,7 +180,7 @@ class _Upstream(object):
 		return [(e.text, e.get('type')) for e in self.node.findall('remote-id') if e.text]
 
 
-class MetaDataXML(object):
+class MetaDataXML:
 	"""Access metadata.xml"""
 
 	def __init__(self, metadata_xml_path, herds):
@@ -488,4 +487,3 @@ def parse_metadata_use(xml_tree):
 				# (flag_restrict can be None)
 				uselist[flag.get("name")][flag_restrict] = " ".join("".join(inner_text).split())
 	return uselist
-

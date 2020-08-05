@@ -6,7 +6,6 @@ import errno
 import itertools
 import logging
 import subprocess
-import sys
 
 import portage
 from portage import _encodings
@@ -51,7 +50,7 @@ _approx_multilib_categories = {
 	"X86_64":        "x86_64",
 }
 
-class LinkageMapELF(object):
+class LinkageMapELF:
 
 	"""Models dynamic linker dependencies."""
 
@@ -59,7 +58,7 @@ class LinkageMapELF(object):
 	_soname_map_class = slot_dict_class(
 		("consumers", "providers"), prefix="")
 
-	class _obj_properties_class(object):
+	class _obj_properties_class:
 
 		__slots__ = ("arch", "needed", "runpaths", "soname", "alt_paths",
 			"owner",)
@@ -102,7 +101,7 @@ class LinkageMapELF(object):
 			self._obj_key_cache[path] = key
 		return key
 
-	class _ObjectKey(object):
+	class _ObjectKey:
 
 		"""Helper class used as _obj_properties keys for objects."""
 
@@ -145,7 +144,7 @@ class LinkageMapELF(object):
 				_unicode_encode(obj,
 					encoding=_encodings['merge'], errors='strict')
 			except UnicodeEncodeError:
-				# The package appears to have been merged with a 
+				# The package appears to have been merged with a
 				# different value of sys.getfilesystemencoding(),
 				# so fall back to utf_8 if appropriate.
 				try:
@@ -250,7 +249,7 @@ class LinkageMapELF(object):
 			if can_lock:
 				self._dbapi.unlock()
 
-		# have to call scanelf for preserved libs here as they aren't 
+		# have to call scanelf for preserved libs here as they aren't
 		# registered in NEEDED.ELF.2 files
 		plibs = {}
 		if preserve_paths is not None:
@@ -485,7 +484,7 @@ class LinkageMapELF(object):
 
 		os = _os_merge
 
-		class _LibraryCache(object):
+		class _LibraryCache:
 
 			"""
 			Caches properties associated with paths.
@@ -516,24 +515,23 @@ class LinkageMapELF(object):
 				"""
 				if obj in cache_self.cache:
 					return cache_self.cache[obj]
-				else:
-					obj_key = self._obj_key(obj)
-					# Check that the library exists on the filesystem.
-					if obj_key.file_exists():
-						# Get the arch and soname from LinkageMap._obj_properties if
-						# it exists. Otherwise, None.
-						obj_props = self._obj_properties.get(obj_key)
-						if obj_props is None:
-							arch = None
-							soname = None
-						else:
-							arch = obj_props.arch
-							soname = obj_props.soname
-						return cache_self.cache.setdefault(obj, \
-								(arch, soname, obj_key, True))
+
+				obj_key = self._obj_key(obj)
+				# Check that the library exists on the filesystem.
+				if obj_key.file_exists():
+					# Get the arch and soname from LinkageMap._obj_properties if
+					# it exists. Otherwise, None.
+					obj_props = self._obj_properties.get(obj_key)
+					if obj_props is None:
+						arch = None
+						soname = None
 					else:
-						return cache_self.cache.setdefault(obj, \
-								(None, None, obj_key, False))
+						arch = obj_props.arch
+						soname = obj_props.soname
+					return cache_self.cache.setdefault(obj, \
+							(arch, soname, obj_key, True))
+				return cache_self.cache.setdefault(obj, \
+						(None, None, obj_key, False))
 
 		rValue = {}
 		cache = _LibraryCache()

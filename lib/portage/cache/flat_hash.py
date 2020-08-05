@@ -7,7 +7,6 @@ from portage.cache import cache_errors
 import errno
 import io
 import stat
-import sys
 import tempfile
 import os as _os
 from portage import os
@@ -23,7 +22,7 @@ class database(fs_template.FsBased):
 
 	def __init__(self, *args, **config):
 		super(database,self).__init__(*args, **config)
-		self.location = os.path.join(self.location, 
+		self.location = os.path.join(self.location,
 			self.label.lstrip(os.path.sep).rstrip(os.path.sep))
 		write_keys = set(self._known_keys)
 		write_keys.add("_eclasses_")

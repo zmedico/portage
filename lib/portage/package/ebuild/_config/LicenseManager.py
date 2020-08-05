@@ -1,4 +1,4 @@
-# Copyright 2010-2015 Gentoo Foundation
+# Copyright 2010-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 __all__ = (
@@ -15,7 +15,7 @@ from portage.versions import cpv_getkey, _pkg_str
 from portage.package.ebuild._config.helper import ordered_by_atom_specificity
 
 
-class LicenseManager(object):
+class LicenseManager:
 
 	def __init__(self, license_group_locations, abs_user_config, user_config=True):
 
@@ -62,7 +62,7 @@ class LicenseManager(object):
 					#No tokens left in atom_license_map, remove it.
 					del self._plicensedict["*/*"]
 		return ret
-	
+
 	def expandLicenseTokens(self, tokens):
 		""" Take a token from ACCEPT_LICENSE or package.license and expand it
 		if it's a group token (indicated by @) or just return it if it's not a

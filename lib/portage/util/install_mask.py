@@ -6,9 +6,7 @@ __all__ = ['install_mask_dir', 'InstallMask']
 import collections
 import errno
 import fnmatch
-import functools
 import operator
-import sys
 
 from portage import os, _unicode_decode
 from portage.exception import (
@@ -33,7 +31,7 @@ _pattern = collections.namedtuple('_pattern', (
 ))
 
 
-class InstallMask(object):
+class InstallMask:
 	def __init__(self, install_mask):
 		"""
 		@param install_mask: INSTALL_MASK value

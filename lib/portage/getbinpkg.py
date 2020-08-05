@@ -1,5 +1,5 @@
 # getbinpkg.py -- Portage binary-package helper functions
-# Copyright 2003-2014 Gentoo Foundation
+# Copyright 2003-2020 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 from portage.output import colorize
@@ -13,6 +13,7 @@ from portage import _unicode_encode
 from portage.package.ebuild.fetch import _hide_url_passwd
 from _emerge.Package import _all_metadata_keys
 
+import pickle
 import sys
 import socket
 import time
@@ -22,20 +23,8 @@ import warnings
 
 _all_errors = [NotImplementedError, ValueError, socket.error]
 
-try:
-	from html.parser import HTMLParser as html_parser_HTMLParser
-except ImportError:
-	from HTMLParser import HTMLParser as html_parser_HTMLParser
-
-try:
-	from urllib.parse import unquote as urllib_parse_unquote
-except ImportError:
-	from urllib2 import unquote as urllib_parse_unquote
-
-try:
-	import cPickle as pickle
-except ImportError:
-	import pickle
+from html.parser import HTMLParser as html_parser_HTMLParser
+from urllib.parse import unquote as urllib_parse_unquote
 
 try:
 	import ftplib
@@ -45,16 +34,10 @@ else:
 	_all_errors.extend(ftplib.all_errors)
 
 try:
-	try:
-		from http.client import HTTPConnection as http_client_HTTPConnection
-		from http.client import BadStatusLine as http_client_BadStatusLine
-		from http.client import ResponseNotReady as http_client_ResponseNotReady
-		from http.client import error as http_client_error
-	except ImportError:
-		from httplib import HTTPConnection as http_client_HTTPConnection
-		from httplib import BadStatusLine as http_client_BadStatusLine
-		from httplib import ResponseNotReady as http_client_ResponseNotReady
-		from httplib import error as http_client_error
+	from http.client import HTTPConnection as http_client_HTTPConnection
+	from http.client import BadStatusLine as http_client_BadStatusLine
+	from http.client import ResponseNotReady as http_client_ResponseNotReady
+	from http.client import error as http_client_error
 except ImportError as e:
 	sys.stderr.write(colorize("BAD", "!!! CANNOT IMPORT HTTP.CLIENT: ") + str(e) + "\n")
 else:
@@ -69,7 +52,7 @@ def make_metadata_dict(data):
 		DeprecationWarning, stacklevel=2)
 
 	myid, _myglob = data
-	
+
 	mydict = {}
 	for k_bytes in portage.xpak.getindex_mem(myid):
 		k = _unicode_decode(k_bytes,
@@ -95,7 +78,7 @@ class ParseLinks(html_parser_HTMLParser):
 
 	def get_anchors(self):
 		return self.PL_anchors
-		
+
 	def get_anchors_by_prefix(self, prefix):
 		newlist = []
 		for x in self.PL_anchors:
@@ -103,7 +86,7 @@ class ParseLinks(html_parser_HTMLParser):
 				if x not in newlist:
 					newlist.append(x[:])
 		return newlist
-		
+
 	def get_anchors_by_suffix(self, suffix):
 		newlist = []
 		for x in self.PL_anchors:
@@ -111,7 +94,7 @@ class ParseLinks(html_parser_HTMLParser):
 				if x not in newlist:
 					newlist.append(x[:])
 		return newlist
-		
+
 	def	handle_endtag(self, tag):
 		pass
 
@@ -188,10 +171,7 @@ def create_conn(baseurl, conn=None):
 			# http.client ImportError handler (like during stage1 -> stage2
 			# builds where USE=ssl is disabled for python).
 			try:
-				try:
-					from http.client import HTTPSConnection as http_client_HTTPSConnection
-				except ImportError:
-					from httplib import HTTPSConnection as http_client_HTTPSConnection
+				from http.client import HTTPSConnection as http_client_HTTPSConnection
 			except ImportError:
 				raise NotImplementedError(
 					_("python must have ssl enabled for https support"))
@@ -235,10 +215,10 @@ def make_ftp_request(conn, address, rest=None, dest=None):
 		DeprecationWarning, stacklevel=2)
 
 	try:
-	
+
 		if dest:
 			fstart_pos = dest.tell()
-	
+
 		conn.voidcmd("TYPE I")
 		fsize = conn.size(address)
 
@@ -276,7 +256,7 @@ def make_ftp_request(conn, address, rest=None, dest=None):
 
 	except ValueError as e:
 		return None, int(str(e)[:4]), str(e)
-	
+
 
 def make_http_request(conn, address, _params={}, headers={}, dest=None):
 	"""Uses the |conn| object to request
@@ -316,7 +296,7 @@ def make_http_request(conn, address, _params={}, headers={}, dest=None):
 							str(parts[1]) + "\n")
 					address = parts[1]
 					break
-	
+
 	if (rc != 200) and (rc != 206):
 		return None, rc, "Server did not respond successfully (%s: %s)" % (str(response.status), str(response.reason))
 
@@ -333,10 +313,10 @@ def match_in_array(array, prefix="", suffix="", match_both=1, allow_overlap=0):
 		DeprecationWarning, stacklevel=2)
 
 	myarray = []
-	
+
 	if not (prefix and suffix):
 		match_both = 0
-		
+
 	for x in array:
 		add_p = 0
 		if prefix and (len(x) >= len(prefix)) and (x[:len(prefix)] == prefix):
@@ -357,7 +337,7 @@ def match_in_array(array, prefix="", suffix="", match_both=1, allow_overlap=0):
 				continue          # Too short to match.
 		else:
 			pass                      # Do whatever... We're overlapping.
-		
+
 		if suffix and (len(x) >= len(suffix)) and (x[-len(suffix):] == suffix):
 			myarray.append(x)   # It matches
 		else:
@@ -388,7 +368,7 @@ def dir_get_list(baseurl, conn=None):
 			# if the address doesn't end with a slash.
 			address += "/"
 		page, rc, msg = make_http_request(conn, address, params, headers)
-		
+
 		if page:
 			parser = ParseLinks()
 			parser.feed(_unicode_decode(page))
@@ -446,7 +426,7 @@ def file_get_metadata(baseurl, conn=None, chunk_size=3000):
 			f.close()
 	else:
 		raise TypeError(_("Unknown protocol. '%s'") % protocol)
-	
+
 	if data:
 		xpaksize = portage.xpak.decodeint(data[-8:-4])
 		if (xpaksize + 8) > chunk_size:
@@ -454,8 +434,7 @@ def file_get_metadata(baseurl, conn=None, chunk_size=3000):
 			if not keepconnection:
 				conn.close()
 			return myid
-		else:
-			xpak_data = data[len(data) - (xpaksize + 8):-8]
+		xpak_data = data[len(data) - (xpaksize + 8):-8]
 		del data
 
 		myid = portage.xpak.xsplit_mem(xpak_data)
@@ -565,7 +544,7 @@ def file_get_lib(baseurl, dest, conn=None):
 				f.close()
 	else:
 		raise TypeError(_("Unknown protocol. '%s'") % protocol)
-	
+
 	if not keepconnection:
 		conn.close()
 
@@ -642,7 +621,7 @@ def dir_get_metadata(baseurl, conn=None, chunk_size=3000, verbose=1, usingcache=
 	tbz2list = match_in_array(filelist, suffix=".tbz2")
 	metalist = match_in_array(filelist, prefix="metadata.idx")
 	del filelist
-	
+
 	# Determine if our metadata file is current.
 	metalist.sort()
 	metalist.reverse() # makes the order new-to-old.
@@ -710,7 +689,7 @@ def dir_get_metadata(baseurl, conn=None, chunk_size=3000, verbose=1, usingcache=
 			break
 	# We may have metadata... now we run through the tbz2 list and check.
 
-	class CacheStats(object):
+	class CacheStats:
 		from time import time
 		def __init__(self, out):
 			self.misses = 0
@@ -806,7 +785,7 @@ def dir_get_metadata(baseurl, conn=None, chunk_size=3000, verbose=1, usingcache=
 
 	if not keepconnection:
 		conn.close()
-	
+
 	return metadata[baseurl]["data"]
 
 def _cmp_cpv(d1, d2):
@@ -814,12 +793,11 @@ def _cmp_cpv(d1, d2):
 	cpv2 = d2["CPV"]
 	if cpv1 > cpv2:
 		return 1
-	elif cpv1 == cpv2:
+	if cpv1 == cpv2:
 		return 0
-	else:
-		return -1
+	return -1
 
-class PackageIndex(object):
+class PackageIndex:
 
 	def __init__(self,
 		allowed_pkg_keys=None,
