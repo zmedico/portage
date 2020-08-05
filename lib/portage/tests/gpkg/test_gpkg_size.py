@@ -5,7 +5,7 @@ import tempfile
 import tarfile
 import sys
 
-from portage import shutil
+from portage import os, shutil
 from portage.tests import TestCase
 from portage.tests.resolver.ResolverPlayground import ResolverPlayground
 from portage.gpkg import gpkg
