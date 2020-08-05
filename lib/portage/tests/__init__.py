@@ -212,8 +212,6 @@ class TestCase(unittest.TestCase):
 		self.cnf_etc_path = cnf_etc_path
 		self.bindir = cnf_bindir
 		self.sbindir = cnf_sbindir
-		if sys.version_info.major < 3:
-			self.subTest = FakeSubTest
 
 	def defaultTestResult(self):
 		return TextTestResult()
@@ -350,13 +348,3 @@ test_versions = ['1.0', '1.0-r1', '2.3_p4', '1.0_alpha57']
 test_slots = [None, '1', 'gentoo-sources-2.6.17', 'spankywashere']
 test_usedeps = ['foo', '-bar', ('foo', 'bar'),
 	('foo', '-bar'), ('foo?', '!bar?')]
-
-class FakeSubTest(object):
-	def __init__(self, **params):
-		pass
-
-	def __enter__(self):
-		return self
-
-	def __exit__(self, exc_type, exc_value, traceback):
-		pass

@@ -35,8 +35,7 @@ from portage import os
 from portage import shutil
 from portage import _encodings, _unicode_decode
 from portage.const import _DEPCLEAN_LIB_CHECK_DEFAULT
-from portage.const import SUPPORTED_BINPKG_FORMATS, SUPPORTED_XPAK_EXTENSIONS, \
-	SUPPORTED_GPKG_EXTENSIONS, TIMESTAMP_FORMAT
+from portage.const import SUPPORTED_XPAK_EXTENSIONS, SUPPORTED_GPKG_EXTENSIONS
 from portage.dbapi.dep_expand import dep_expand
 from portage.dbapi._expand_new_virt import expand_new_virt
 from portage.dbapi.IndexedPortdb import IndexedPortdb
@@ -2006,7 +2005,7 @@ def action_info(settings, trees, myopts, myfiles):
 					ebuild_file_contents = portage.xpak.tbz2(binpkg_file)\
 						.getfile(ebuild_file_name)
 				elif binpkg_file.endswith(SUPPORTED_GPKG_EXTENSIONS):
-					ebuild_file_contents = portage.gpkg.gpkg(settings, 
+					ebuild_file_contents = portage.gpkg.gpkg(settings,
 						pkg.cpv, binpkg_file).get_metadata(ebuild_file_name)
 				else:
 					continue

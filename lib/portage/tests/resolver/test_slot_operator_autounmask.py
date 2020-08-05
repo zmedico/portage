@@ -119,7 +119,7 @@ class SlotOperatorAutoUnmaskTestCase(TestCase):
 			with self.subTest(binpkg_format=binpkg_format):
 				print(colorize("HILITE", binpkg_format), end=" ... ")
 				sys.stdout.flush()
-				playground = ResolverPlayground(ebuilds=ebuilds, 
+				playground = ResolverPlayground(ebuilds=ebuilds,
 					binpkgs=binpkgs, installed=installed, world=world,
 					debug=False,
 					user_config={

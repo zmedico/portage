@@ -75,7 +75,7 @@ class CompeteIfNewSubSlotWithoutRevBumpTestCase(TestCase):
 				sys.stdout.flush()
 				playground = ResolverPlayground(ebuilds=ebuilds,
 					binpkgs=binpkgs, installed=installed, world=world,
-					debug=False, 
+					debug=False,
 					user_config={
 						"make.conf":
 						(

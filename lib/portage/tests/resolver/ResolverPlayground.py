@@ -478,28 +478,28 @@ class ResolverPlayground:
 				os.symlink(sub_profile_dir, os.path.join(user_config_dir, "make.profile"))
 
 		gpg_test_path = os.environ["GNUPGHOME"]
-			
+
 		make_conf = {
 			"ACCEPT_KEYWORDS": "x86",
-			"BINPKG_GPG_UNLOCK_COMMAND": 
+			"BINPKG_GPG_UNLOCK_COMMAND":
 				'/usr/bin/gpg --detach-sig --armor --batch --no-tty --yes '
 				'--digest-algo SHA256 --homedir "%s" '
 				'--pinentry-mode loopback --passphrase "GentooTest" '
 				'--local-user 5D90EA06352177F6 --output /dev/null /dev/null'
 				% gpg_test_path,
-			"BINPKG_GPG_SIGNING_COMMAND": 
+			"BINPKG_GPG_SIGNING_COMMAND":
 				'/usr/bin/gpg --detach-sig --armor --batch --no-tty --yes '
 				'--digest-algo SHA256 --homedir "%s" '
 				'--local-user 5D90EA06352177F6'
 				% gpg_test_path,
-			"BINPKG_GPG_VERIFY_COMMAND": 
+			"BINPKG_GPG_VERIFY_COMMAND":
 				'/usr/bin/gpg --verify --batch --no-tty --yes --status-fd 1 '
 				'--homedir "%s" "\\\\${SIGN_FILE}" -'
 				% gpg_test_path,
 			"CLEAN_DELAY": "0",
 			"DISTDIR" : self.distdir,
 			"EMERGE_WARNING_DELAY": "0",
-			"FEATURES": 
+			"FEATURES":
 				'${FEATURES} binpkg-signing binpkg-request-signature '
 				'gpg-keepalive',
 			"PKGDIR": self.pkgdir,

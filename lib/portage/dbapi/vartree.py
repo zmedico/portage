@@ -1977,7 +1977,7 @@ class dblink:
 		self.contentscache = pkgfiles
 		return pkgfiles
 
-	def quickpkg(self, output_file, metadata=None, 
+	def quickpkg(self, output_file, metadata=None,
 		include_config=False, include_unmodified_config=False):
 		"""
 		Create a tar file appropriate for use by quickpkg.

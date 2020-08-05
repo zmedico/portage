@@ -14,8 +14,6 @@ from portage import os
 from portage import shutil
 from portage.tests import TestCase
 from portage.tests.resolver.ResolverPlayground import ResolverPlayground
-from portage.tests.util.test_socks5 import AsyncHTTPServer
-from portage.util._compare_files import compare_files
 from portage.exception import InvalidSignature
 from portage.gpg import GPG
 
@@ -167,5 +165,5 @@ IkCfAP49AOYjzuQPP0n5P0SGCINnAVEXN7QLQ4PurY/lt7cT2gEAq01stXjFhrz5
 			self.assertRaises(InvalidSignature, test_gpkg.get_metadata_url,
 				'http://127.0.0.1:' + str(port) + '/test-2.gpkg.tar')
 		finally:
-			#shutil.rmtree(tmpdir)
+			shutil.rmtree(tmpdir)
 			playground.cleanup()
