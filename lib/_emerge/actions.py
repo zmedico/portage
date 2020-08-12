@@ -40,8 +40,8 @@ from portage.dbapi.IndexedPortdb import IndexedPortdb
 from portage.dbapi.IndexedVardb import IndexedVardb
 from portage.dep import Atom, _repo_separator, _slot_separator
 from portage.exception import InvalidAtom, InvalidData, ParseError, GPGException
-from portage.output import blue, colorize, create_color_func, darkgreen, \
-	red, xtermTitle, xtermTitleReset, yellow
+from portage.output import colorize, create_color_func, darkgreen, \
+	red, xtermTitle, xtermTitleReset
 good = create_color_func("GOOD")
 bad = create_color_func("BAD")
 warn = create_color_func("WARN")

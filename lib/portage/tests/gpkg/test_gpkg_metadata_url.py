@@ -41,7 +41,7 @@ class test_gpkg_metadata_url_case(TestCase):
 		server = threading.Thread(target=self.httpd, args=(directory, port),
 			daemon=True)
 		server.start()
-		return(server)
+		return server
 
 	def test_gpkg_get_metadata_url(self):
 		if sys.version_info.major < 3:

@@ -1278,7 +1278,7 @@ class gpkg:
 		if find_binary(cmd[0]) is None:
 			raise CompressorNotFound(cmd[0])
 
-		return(cmd)
+		return cmd
 
 	def _get_compression_cmd(self, compression=None):
 		"""
@@ -1287,7 +1287,7 @@ class gpkg:
 		if compression is None:
 			compression = self.compression
 		if compression is None:
-			return(None)
+			return None
 		else:
 			return self._get_binary_cmd(compression, "compress")
 
@@ -1298,7 +1298,7 @@ class gpkg:
 		if compression is None:
 			compression = self.compression
 		if compression is None:
-			return(None)
+			return None
 		else:
 			return self._get_binary_cmd(compression, "decompress")
 
@@ -1314,14 +1314,14 @@ class gpkg:
 		fileobj.seek(old_position)
 
 		if magic == b'ustar  \x00':
-			return(tarfile.GNU_FORMAT)
+			return tarfile.GNU_FORMAT
 		elif magic == b'ustar\x0000':
 			if typeflag == b'x' or typeflag == b'g':
-				return(tarfile.PAX_FORMAT)
+				return tarfile.PAX_FORMAT
 			else:
-				return(tarfile.USTAR_FORMAT)
+				return tarfile.USTAR_FORMAT
 
-		return(None)
+		return None
 
 	def _get_tar_format_from_stats(self, image_max_path_length,
 		image_max_file_size, image_total_size):
@@ -1471,7 +1471,7 @@ class gpkg:
 
 		data_tarinfo = tarfile.TarInfo(os.path.join(
 			self.base_name, file_name + '.tar' + ext))
-		return(data_tarinfo)
+		return data_tarinfo
 
 	def _extract_filename_compression(self, file_name):
 		"""
