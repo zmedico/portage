@@ -24,7 +24,9 @@ module_spec = {
 				'repoman_incrementals', 'env', 'have', 'dev_keywords'
 			],
 			'func_kwargs': {
+				'async_safe_data': (None, None),
 				'ebuild': (None, None),
+				'executor': (None, None),
 				'pkg': (None, None),
 			},
 			'module_runsIn': ['ebuilds'],

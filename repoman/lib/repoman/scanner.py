@@ -1,7 +1,9 @@
 # -*- coding:utf-8 -*-
 
+import functools
 import logging
 import portage
+import types
 
 from itertools import chain
 
@@ -9,7 +11,10 @@ from portage import normalize_path
 from portage import os
 from portage._sets.base import InternalPackageSet
 from portage.output import green
+from portage.util.futures import asyncio
+from portage.util.futures.executor.fork import ForkExecutor
 from portage.util.futures.extendedfutures import ExtendedFuture
+from portage.util.futures.iter_completed import iter_completed
 
 from repoman.metadata import get_metadata_xsd
 from repoman.modules.commit import repochecks
@@ -306,6 +311,11 @@ class Scanner:
 			checkdirlist = os.listdir(checkdir)
 
 			dynamic_data = {
+				'async_safe_data': None,
+				#'executor': ForkExecutor(max_workers=self.options.jobs),
+				# Use max_workers=True since ProfileDependsChecks._iter_tasks
+				# relies on immediate fork to get a correct snapshot of state.
+				'executor': ForkExecutor(max_workers=True),
 				'changelog_modified': False,
 				'checkdirlist': ExtendedFuture(checkdirlist),
 				'checkdir': checkdir,
@@ -364,14 +374,22 @@ class Scanner:
 			changelog_path = os.path.join(checkdir_relative, "ChangeLog")
 			dynamic_data["changelog_modified"] = changelog_path in self.changed.changelogs
 
-			self._scan_ebuilds(ebuildlist, dynamic_data)
+			async_tasks = list(self._scan_ebuilds(ebuildlist, dynamic_data))
+			if async_tasks:
+				for task in iter_completed((func() for func in async_tasks), max_jobs=self.options.jobs, max_load=self.options.load_average):
+					task.result()
+
+			self._scan_ebuilds_final_checks(dynamic_data)
 
 
 	def _scan_ebuilds(self, ebuildlist, dynamic_data):
 
 		for y_ebuild in ebuildlist:
+			dynamic_data = dynamic_data.copy()
 			self.reset_futures(dynamic_data)
 			dynamic_data['y_ebuild'] = y_ebuild
+			# Async code uses this to store ebuild data.
+			dynamic_data['async_safe_data'] = types.SimpleNamespace()
 
 			# initialize per ebuild plugin checks here
 			# need to set it up for ==> self.modules_list or some other ordered list
@@ -387,8 +405,21 @@ class Scanner:
 				if do_it:
 					for func in functions:
 						logging.debug("\tRunning function: %s", func)
-						_continue = func(**self.set_func_kwargs(mod, dynamic_data))
-						if _continue:
+						if asyncio.iscoroutinefunction(func):
+							loop = asyncio._wrap_loop()
+							if self.options.jobs == 1:
+								loop.run_until_complete(func(loop=loop, **self.set_func_kwargs(mod, dynamic_data.copy())))
+							else:
+								if False:
+									# Performs worse, but why?
+									yield functools.partial(func, loop=loop, **self.set_func_kwargs(mod, dynamic_data))
+								else:
+									future = func(loop=loop, **self.set_func_kwargs(mod, dynamic_data))
+									loop.run_until_complete(future)
+									yield lambda: future
+							continue
+
+						if func(**self.set_func_kwargs(mod, dynamic_data.copy())):
 							# If we can't access all the metadata then it's totally unsafe to
 							# commit since there's no way to generate a correct Manifest.
 							# Do not try to do any more QA checks on this package since missing
@@ -399,6 +430,7 @@ class Scanner:
 
 			logging.debug("Finished ebuild plugin loop, continuing...")
 
+	def _scan_ebuilds_final_checks(self, dynamic_data):
 		# Final checks
 		# initialize per pkg plugin final checks here
 		# need to set it up for ==> self.modules_list or some other ordered list

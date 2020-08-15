@@ -19,7 +19,6 @@ from portage.package.ebuild.profile_iuse import iter_iuse_vars
 from portage.util import getconfig
 from portage.util.futures import asyncio
 from portage.util.futures.compat_coroutine import coroutine, coroutine_return
-from portage.util.futures.executor.fork import ForkExecutor
 from portage.util.futures.iter_completed import async_iter_completed
 
 
@@ -71,6 +70,19 @@ class ProfileDependsChecks(ScanBase):
 		ebuild = kwargs.get('ebuild').get()
 		pkg = kwargs.get('pkg').get()
 
+		if hasattr(kwargs['async_safe_data'], 'ebuild'):
+			raise AssertionError(repr(kwargs['async_safe_data'].ebuild))
+
+		# Clone ebuild, since its state mutates for each ebuild checked.
+		ebuild = kwargs['async_safe_data'].ebuild = types.SimpleNamespace(
+			archs=ebuild.archs,
+			eapi=ebuild.eapi,
+			inherited=ebuild.inherited,
+			keywords=ebuild.keywords,
+			metadata=ebuild.metadata,
+			relative_path=ebuild.relative_path,
+		)
+
 		ebuild.unknown_pkgs, ebuild.baddepsyntax = _depend_checks(
 			ebuild, pkg, self.portdb, self.qatracker, self.repo_metadata,
 			self.repo_settings.qadata)
@@ -96,19 +108,18 @@ class ProfileDependsChecks(ScanBase):
 		relevant_profiles.sort(key=sort_key)
 		ebuild.relevant_profiles = relevant_profiles
 
+		# For --jobs=1, run tasks in current process. This cannot run
+		# via async_check due to event loop recursion.
 		if self.options.jobs <= 1:
 			for task in self._iter_tasks(None, None, ebuild, pkg):
 				task, results = task
 				for result in results:
 					self._check_result(task, result)
 
-		loop = asyncio._wrap_loop()
-		loop.run_until_complete(self._async_check(loop=loop, **kwargs))
-
 		return False
 
 	@coroutine
-	def _async_check(self, loop=None, **kwargs):
+	def async_check(self, loop=None, **kwargs):
 		'''Perform async profile dependant dependency checks
 
 		@param arches:
@@ -119,14 +130,11 @@ class ProfileDependsChecks(ScanBase):
 		@returns: dictionary
 		'''
 		loop = asyncio._wrap_loop(loop)
-		ebuild = kwargs.get('ebuild').get()
+		ebuild = kwargs['async_safe_data'].ebuild
+		executor = kwargs['executor']
 		pkg = kwargs.get('pkg').get()
 		unknown_pkgs = ebuild.unknown_pkgs
 		baddepsyntax = ebuild.baddepsyntax
-
-		# Use max_workers=True to ensure immediate fork, since _iter_tasks
-		# needs the fork to create a snapshot of current state.
-		executor = ForkExecutor(max_workers=self.options.jobs)
 
 		if self.options.jobs > 1:
 			for future_done_set in async_iter_completed(self._iter_tasks(loop, executor, ebuild, pkg),
@@ -350,7 +358,7 @@ class ProfileDependsChecks(ScanBase):
 	@property
 	def runInEbuilds(self):
 		'''Ebuild level scans'''
-		return (True, [self.check])
+		return (True, [self.check, self.async_check])
 
 	@staticmethod
 	def _populate_implicit_iuse(config, repo_locations):
