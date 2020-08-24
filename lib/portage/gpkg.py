@@ -1382,6 +1382,12 @@ class gpkg:
 				path_length = len(_unicode_encode(d, encoding=_encodings['fs'],
 					errors='strict')) - root_dir_length
 
+				if os.path.islink(d):
+					path_link = os.readlink(d)
+					path_link_length = len(_unicode_encode(path_link,
+						encoding=_encodings['fs'], errors='strict'))
+					path_length = max(path_length, path_link_length)
+
 				if path_length > image_max_path_length:
 					image_max_path_length = path_length
 
@@ -1396,6 +1402,12 @@ class gpkg:
 				f = os.path.join(parent, f)
 				path_length = len(_unicode_encode(f, encoding=_encodings['fs'],
 					errors='strict')) - root_dir_length
+
+				if os.path.islink(f):
+					path_link = os.readlink(f)
+					path_link_length = len(_unicode_encode(path_link,
+						encoding=_encodings['fs'], errors='strict'))
+					path_length = max(path_length, path_link_length)
 
 				if path_length > image_max_path_length:
 					image_max_path_length = path_length
