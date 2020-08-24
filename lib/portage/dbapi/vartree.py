@@ -933,7 +933,7 @@ class vardbapi(dbapi):
 		self._bump_mtime(cpv)
 
 	@coroutine
-	def unpack_metadata(self, pkg, dest_dir):
+	def unpack_metadata(self, pkg, dest_dir, loop=None):
 		"""
 		Unpack package metadata to a directory. This method is a coroutine.
 
@@ -942,7 +942,7 @@ class vardbapi(dbapi):
 		@param dest_dir: destination directory
 		@type dest_dir: str
 		"""
-		loop = asyncio._wrap_loop()
+		loop = asyncio._wrap_loop(loop)
 		if not isinstance(pkg, portage.config):
 			cpv = pkg
 		else:
@@ -958,7 +958,7 @@ class vardbapi(dbapi):
 
 	@coroutine
 	def unpack_contents(self, pkg, dest_dir,
-		include_config=None, include_unmodified_config=None):
+		include_config=None, include_unmodified_config=None, loop=None):
 		"""
 		Unpack package contents to a directory. This method is a coroutine.
 
@@ -984,7 +984,7 @@ class vardbapi(dbapi):
 			by QUICKPKG_DEFAULT_OPTS).
 		@type include_unmodified_config: bool
 		"""
-		loop = asyncio._wrap_loop()
+		loop = asyncio._wrap_loop(loop)
 		if not isinstance(pkg, portage.config):
 			settings = self.settings
 			cpv = pkg

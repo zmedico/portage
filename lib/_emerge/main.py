@@ -26,7 +26,7 @@ options=[
 "--ask-enter-invalid",
 "--buildpkgonly",
 "--changed-use",
-"--changelog",    "--columns",
+"--columns",
 "--debug",
 "--digest",
 "--emptytree",
@@ -58,7 +58,6 @@ shortmapping={
 "e":"--emptytree",
 "f":"--fetchonly", "F":"--fetch-all-uri",
 "h":"--help",
-"l":"--changelog",
 "n":"--noreplace", "N":"--newuse",
 "o":"--onlydeps",  "O":"--nodeps",
 "p":"--pretend",   "P":"--prune",
@@ -172,6 +171,7 @@ def insert_optional_args(args):
 	short_arg_opts = {
 		'D' : valid_integers,
 		'j' : valid_integers,
+		'l' : valid_floats,
 	}
 
 	# Don't make things like "-kn" expand to "-k n"
@@ -543,6 +543,7 @@ def parse_opts(tmpcmdline, silent=False):
 		},
 
 		"--load-average": {
+			"shortopt" : "-l",
 
 			"help"   :"Specifies that no new builds should be started " + \
 				"if there are other builds running and the load average " + \

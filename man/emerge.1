@@ -504,12 +504,6 @@ NOTE: This option ignores the state of the "test" USE flag, since that flag
 has a special binding to FEATURES="test" (see \fBmake.conf\fR(5) for more
 information about \fBFEATURES\fR settings).
 .TP
-.BR \-\-changelog ", " \-l
-Use this in conjunction with the \fB\-\-pretend\fR option.  This will
-show the ChangeLog entries for all the packages that will be upgraded.
-This option is deprecated because ChangeLog files are no longer
-distributed with Gentoo's ebuild repository.
-.TP
 .BR "\-\-color < y | n >"
 Enable or disable color output.  This option will override \fINOCOLOR\fR
 (see \fBmake.conf\fR(5)) and may also be used to force color output when stdout
@@ -694,7 +688,7 @@ dependencies are recalculated for remaining packages and any with
 unsatisfied dependencies are automatically dropped. Also see
 the related \fB\-\-skipfirst\fR option.
 .TP
-.BR "\-\-load\-average [LOAD]"
+.BR \-l\ [LOAD] ", "  \-\-load\-average[=LOAD]
 Specifies that no new builds should be started if there are other builds
 running and the load average is at least LOAD (a floating-point number).
 With no argument, removes a previous load limit.
