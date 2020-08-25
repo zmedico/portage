@@ -1386,7 +1386,11 @@ class gpkg:
 					path_link = os.readlink(d)
 					path_link_length = len(_unicode_encode(path_link,
 						encoding=_encodings['fs'], errors='strict'))
-					path_length = max(path_length, path_link_length)
+					if path_link_length > 99:
+						# Max ustar symlink path length is 99
+						path_length = max(path_length, 256)
+					else:
+						path_length = max(path_length, path_link_length)
 
 				if path_length > image_max_path_length:
 					image_max_path_length = path_length
@@ -1407,7 +1411,11 @@ class gpkg:
 					path_link = os.readlink(f)
 					path_link_length = len(_unicode_encode(path_link,
 						encoding=_encodings['fs'], errors='strict'))
-					path_length = max(path_length, path_link_length)
+					if path_link_length > 99:
+						# Max ustar symlink path length is 99
+						path_length = max(path_length, 256)
+					else:
+						path_length = max(path_length, path_link_length)
 
 				if path_length > image_max_path_length:
 					image_max_path_length = path_length
@@ -1451,6 +1459,16 @@ class gpkg:
 
 			path_length = len(_unicode_encode(path, encoding=_encodings['fs'],
 				errors='strict')) - root_dir_length
+
+			if os.path.islink(path):
+				path_link = os.readlink(path)
+				path_link_length = len(_unicode_encode(path_link,
+					encoding=_encodings['fs'], errors='strict'))
+				if path_link_length > 99:
+					# Max ustar symlink path length is 99
+					path_length = max(path_length, 256)
+				else:
+					path_length = max(path_length, path_link_length)
 
 			if path_length > image_max_path_length:
 				image_max_path_length = path_length

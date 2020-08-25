@@ -224,10 +224,7 @@ class test_gpkg_path_case(TestCase):
 			os.symlink(
 				'aaaabbbb/ccccdddd/eeeeffff/gggghhhh/iiiijjjj/kkkkllll/'
 				'mmmmnnnn/oooopppp/qqqqrrrr/sssstttt/uuuuvvvv/wwwwxxxx/'
-				'yyyyzzzz/00001111/22223333/44445555/66667777/88889999/'
-				'aaaabbbb/ccccdddd/eeeeffff/gggghhhh/iiiijjjj/kkkkllll/'
-				'mmmmnnnn/oooopppp/qqqqrrrr/sssstttt/uuuuvvvv/wwwwxxxx/'
-				'yyyyzzzz/00001111/22223333/44445555/66667777/88889999/',
+				'yyyyzzzz/00001111/22223333/44445555/66667777/88889999/test',
 				os.path.join(orig_full_path, 'a_long_symlink'))
 
 			gpkg_file_loc = os.path.join(tmpdir, 'test.gpkg.tar')
@@ -235,7 +232,7 @@ class test_gpkg_path_case(TestCase):
 
 			check_result = test_gpkg._check_pre_image_files(
 				os.path.join(tmpdir, 'orig'))
-			self.assertEqual(check_result, (324, 0, 0))
+			self.assertEqual(check_result, (256, 0, 0))
 
 			test_gpkg.compress(os.path.join(tmpdir, 'orig'), {'meta': 'test'})
 			with open(gpkg_file_loc, 'rb') as container:
