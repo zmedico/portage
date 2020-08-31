@@ -727,7 +727,7 @@ class gpkg:
 				self._get_inner_tarinfo(container, 'image')
 
 			with tar_stream_reader(container.extractfile(image_tarinfo),
-				self._get_decompression_cmd()) as image_tar:
+				self._get_decompression_cmd(image_comp)) as image_tar:
 
 				with tarfile.open(mode='r|', fileobj=image_tar) as image:
 					try:
