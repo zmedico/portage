@@ -522,21 +522,21 @@ def action_build(emerge_config, trees=DeprecationWarning,
 						level=logging.ERROR, noiselevel=-1)
 					return 1
 
-		# unlock GPG if needed
-		if need_write_bindb:
-			if ("binpkg-signing" in trees[eroot]["root_config"].
-				settings.features) and (
-				"BINPKG_GPG_UNLOCK_COMMAND" in trees[eroot]["root_config"].
-				settings):
-				portage.writemsg_stdout(">>> Unlocking GPG... ")
-				sys.stdout.flush()
-				gpg = GPG(trees[eroot]["root_config"].settings)
-				try:
-					gpg.unlock()
-				except GPGException as e:
-					writemsg_level(colorize("BAD", "!!! %s\n" % e),
-						level=logging.ERROR, noiselevel=-1)
-					return 1
+				# unlock GPG if needed
+				if need_write_bindb and (eroot in ebuild_eroots) and \
+					("binpkg-signing" in
+						trees[eroot]["root_config"].settings.features) and \
+					("BINPKG_GPG_UNLOCK_COMMAND" in
+						trees[eroot]["root_config"].settings):
+						portage.writemsg_stdout(">>> Unlocking GPG... ")
+						sys.stdout.flush()
+						gpg = GPG(trees[eroot]["root_config"].settings)
+						try:
+							gpg.unlock()
+						except GPGException as e:
+							writemsg_level(colorize("BAD", "!!! %s\n" % e),
+								level=logging.ERROR, noiselevel=-1)
+							return 1
 
 		if "--resume" in myopts:
 			favorites=mtimedb["resume"]["favorites"]
