@@ -133,10 +133,7 @@ class RsyncSync(NewBase):
 		if self.verify_metamanifest and gemato is not None:
 			# Use isolated environment if key is specified,
 			# system environment otherwise
-			if self.repo.sync_openpgp_key_path is not None:
-				openpgp_env = gemato.openpgp.OpenPGPEnvironment()
-			else:
-				openpgp_env = gemato.openpgp.OpenPGPSystemEnvironment()
+			openpgp_env = self._get_openpgp_env(self.repo.sync_openpgp_key_path)
 
 		try:
 			# Load and update the keyring early. If it fails, then verification
@@ -230,15 +227,16 @@ class RsyncSync(NewBase):
 			addrinfos = None
 			uris = []
 
-			try:
-				addrinfos = getaddrinfo_validate(
-					socket.getaddrinfo(getaddrinfo_host, None,
-					family, socket.SOCK_STREAM))
-			except socket.error as e:
-				writemsg_level(
-					"!!! getaddrinfo failed for '%s': %s\n"
-					% (_unicode_decode(hostname), str(e)),
-					noiselevel=-1, level=logging.ERROR)
+			if 'RSYNC_PROXY' not in self.spawn_kwargs['env']:
+				try:
+					addrinfos = getaddrinfo_validate(
+						socket.getaddrinfo(
+							getaddrinfo_host, None, family, socket.SOCK_STREAM))
+				except socket.error as e:
+					writemsg_level(
+						"!!! getaddrinfo failed for '%s': %s\n"
+						% (_unicode_decode(hostname), str(e)),
+						noiselevel=-1, level=logging.ERROR)
 
 			if addrinfos:
 
@@ -360,7 +358,7 @@ class RsyncSync(NewBase):
 			# if synced successfully, verify now
 			if exitcode == 0 and self.verify_metamanifest:
 				if gemato is None:
-					writemsg_level("!!! Unable to verify: gemato-11.0+ is required\n",
+					writemsg_level("!!! Unable to verify: gemato-14.5+ is required\n",
 						level=logging.ERROR, noiselevel=-1)
 					exitcode = 127
 				else:
