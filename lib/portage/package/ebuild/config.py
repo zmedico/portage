@@ -31,8 +31,8 @@ from portage import bsd_chflags, \
 from portage.const import CACHE_PATH, \
 	DEPCACHE_PATH, INCREMENTALS, MAKE_CONF_FILE, \
 	MODULES_FILE_PATH, PORTAGE_BASE_PATH, \
-	PRIVATE_PATH, PROFILE_PATH, USER_CONFIG_PATH, \
-	USER_VIRTUALS_FILE
+	PRIVATE_PATH, PROFILE_PATH, SUPPORTED_GENTOO_BINPKG_FORMATS, \
+	USER_CONFIG_PATH, USER_VIRTUALS_FILE
 from portage.dbapi import dbapi
 from portage.dep import Atom, isvalidatom, match_from_list, use_reduce, _repo_separator, _slot_separator
 from portage.eapi import (eapi_exports_AA, eapi_exports_merge_type,
@@ -1214,6 +1214,13 @@ class config:
 
 			if warning_shown and platform.python_implementation() == 'PyPy':
 				writemsg(_("!!! See https://bugs.pypy.org/issue833 for details.\n"),
+					noiselevel=-1)
+
+		binpkg_format = self.get("BINPKG_FORMAT")
+		if binpkg_format:
+			if binpkg_format not in SUPPORTED_GENTOO_BINPKG_FORMATS:
+				writemsg("!!! BINPKG_FORMAT contains invalid or "
+					"unsupported format: %s" % binpkg_fotmat,
 					noiselevel=-1)
 
 		binpkg_compression = self.get("BINPKG_COMPRESS")
