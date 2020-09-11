@@ -359,6 +359,7 @@ class checksum_helper:
 				._hashobject())
 
 		# GPG
+		env = self.settings.environ()
 		if self.gpg_operation == checksum_helper.SIGNING:
 			self.GPG_signing_command = self.settings.get(
 				"BINPKG_GPG_SIGNING_COMMAND", None)
@@ -369,7 +370,7 @@ class checksum_helper:
 				self.GPG_signing_command = [
 					x for x in self.GPG_signing_command if x != ""]
 				try:
-					os.environ["GPG_TTY"] = os.ttyname(sys.stdout.fileno())
+					env["GPG_TTY"] = os.ttyname(sys.stdout.fileno())
 				except OSError:
 					pass
 			else:
@@ -377,7 +378,7 @@ class checksum_helper:
 
 			self.gpg_proc = subprocess.Popen(self.GPG_signing_command,
 				stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-				stderr=subprocess.PIPE)
+				stderr=subprocess.PIPE, env=env)
 
 		elif self.gpg_operation == checksum_helper.VERIFY:
 			if signature is None:
@@ -408,7 +409,7 @@ class checksum_helper:
 
 			self.gpg_proc = subprocess.Popen(self.GPG_verify_command,
 				stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-				stderr=subprocess.PIPE)
+				stderr=subprocess.PIPE, env=env)
 
 	def __del__(self):
 		self.finish()
