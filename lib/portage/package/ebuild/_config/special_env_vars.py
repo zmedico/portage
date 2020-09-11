@@ -41,7 +41,7 @@ environ_whitelist = []
 # in it's bashrc (causing major leakage).
 environ_whitelist += [
 	"ACCEPT_LICENSE", "BASH_ENV", "BASH_FUNC____in_portage_iuse%%",
-	"BROOT", "BUILD_PREFIX", "COLUMNS", "D",
+	"BINPKG_FORMAT", "BROOT", "BUILD_PREFIX", "COLUMNS", "D",
 	"DISTDIR", "DOC_SYMLINKS_DIR", "EAPI", "EBUILD",
 	"EBUILD_FORCE_TEST",
 	"EBUILD_PHASE", "EBUILD_PHASE_FUNC", "ECLASSDIR", "ECLASS_DEPTH", "ED",

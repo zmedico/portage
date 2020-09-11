@@ -533,6 +533,14 @@ def doebuild_environment(myebuild, mydo, myroot=None, settings=None,
 				mysettings["KV"] = ""
 			mysettings.backup_changes("KV")
 
+		binpkg_format = mysettings.get("BINPKG_FORMAT", "xpak")
+		if binpkg_format not in portage.const.SUPPORTED_GENTOO_BINPKG_FORMATS:
+			writemsg("!!! BINPKG_FORMAT contains invalid or "
+				"unsupported format: %s" % binpkg_fotmat,
+				noiselevel=-1)
+			binpkg_format = "xpak"
+		mysettings['BINPKG_FORMAT'] = binpkg_format
+
 		binpkg_compression = mysettings.get("BINPKG_COMPRESS", "bzip2")
 		try:
 			compression = _compressors[binpkg_compression]
