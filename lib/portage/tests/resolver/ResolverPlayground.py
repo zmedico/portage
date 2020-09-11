@@ -161,8 +161,9 @@ class ResolverPlayground:
 		self._create_profile(ebuilds, eclasses, installed, profile, repo_configs, user_config, sets)
 		self._create_world(world, world_sets)
 
-		self.settings, self.trees = self._load_config()
+		self.settings, self.trees = self._load_config()		
 
+		self.gpg = None
 		self._create_binpkgs(binpkgs)
 		self._create_ebuild_manifests(ebuilds)
 
@@ -272,8 +273,9 @@ class ResolverPlayground:
 		items = items() if items is not None else binpkgs
 		binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 		if binpkg_format == "gpkg":
-			gpg = GPG(self.settings)
-			gpg.unlock()
+			if self.gpg is None:
+				self.gpg = GPG(self.settings)
+				self.gpg.unlock()
 		for cpv, metadata in items:
 			a = Atom("=" + cpv, allow_repo=True)
 			repo = a.repo
@@ -675,6 +677,8 @@ class ResolverPlayground:
 				return
 
 	def cleanup(self):
+		if self.gpg is not None:
+			self.gpg.stop()
 		for eroot in self.trees:
 			portdb = self.trees[eroot]["porttree"].dbapi
 			portdb.close_caches()
