@@ -20,6 +20,7 @@ class GPG:
 		Portage settings are needed to run GPG unlock command.
 		"""
 		self.settings = settings
+		self.thread = None
 		self.GPG_unlock_command = self.settings.get(
 			"BINPKG_GPG_UNLOCK_COMMAND", None)
 		if "gpg-keepalive" in self.settings.features:
@@ -57,12 +58,26 @@ class GPG:
 					daemon=True)
 				self.thread.start()
 
+	def stop(self):
+		"""
+		Stop keepalive thread.
+		"""
+		if self.thread is not None:
+			self.keepalive = False
+
 	def gpg_keepalive(self):
 		"""
 		Call GPG unlock command every 5 mins to avoid the passphrase expired.
 		"""
-		while True:
-			time.sleep(300)
+		count = 0
+		while self.keepalive:
+			if count < 5:
+				time.sleep(60)
+				count += 1
+				continue
+			else:
+				count = 0
+
 			proc = subprocess.Popen(self.GPG_unlock_command,
 				stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
 				stderr=subprocess.STDOUT)
