@@ -161,7 +161,7 @@ class ResolverPlayground:
 		self._create_profile(ebuilds, eclasses, installed, profile, repo_configs, user_config, sets)
 		self._create_world(world, world_sets)
 
-		self.settings, self.trees = self._load_config()		
+		self.settings, self.trees = self._load_config()
 
 		self.gpg = None
 		self._create_binpkgs(binpkgs)
