@@ -1027,7 +1027,8 @@ class vardbapi(dbapi):
 			if proc.returncode != os.EX_OK:
 				raise PortageException('command failed: {}'.format(tar_cmd))
 		elif binpkg_format == "gpkg":
-			_, gpkg_tmp = tempfile.mkstemp(suffix=".gpkg.tar")
+			gpkg_tmp_fd, gpkg_tmp = tempfile.mkstemp(suffix=".gpkg.tar")
+			os.close(gpkg_tmp_fd)
 			excluded_config_files = (yield loop.run_in_executor(ForkExecutor(loop=loop),
 				functools.partial(self._dblink(cpv).quickpkg,
 				gpkg_tmp,
