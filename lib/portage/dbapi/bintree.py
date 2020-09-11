@@ -1512,7 +1512,11 @@ class binarytree:
 		"""
 
 		pkg_path = self.getname(cpv)
-		binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+		if hasattr(cpv, "_metadata"):
+			binpkg_format = cpv._metadata.get('BINPKG_FORMAT',
+				self.settings.get("BINPKG_FORMAT", "xpak"))
+		else:
+			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 
 		d = dict(cpv._metadata.items())
 		d.update(perform_multiple_checksums(
@@ -1711,7 +1715,11 @@ class binarytree:
 			cpv = _pkg_str(cpv)
 
 		if binpkg_format is None:
-			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+			if hasattr(cpv, "_metadata"):
+				binpkg_format = cpv._metadata.get('BINPKG_FORMAT',
+					self.settings.get("BINPKG_FORMAT", "xpak"))
+			else:
+				binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 
 		filename = None
 		if allocate_new:
@@ -1776,7 +1784,12 @@ class binarytree:
 		return max_build_id
 
 	def _allocate_filename(self, cpv):
-		binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+		if hasattr(cpv, "_metadata"):
+			binpkg_format = cpv._metadata.get('BINPKG_FORMAT',
+				self.settings.get("BINPKG_FORMAT", "xpak"))
+		else:
+			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+
 		if binpkg_format == "xpak":
 			return os.path.join(self.pkgdir, cpv + ".tbz2")
 		elif binpkg_format == "gpkg":
@@ -1796,7 +1809,12 @@ class binarytree:
 		pf = catsplit(cpv)[1]
 		build_id = max_build_id + 1
 
-		binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+		if hasattr(cpv, "_metadata"):
+			binpkg_format = cpv._metadata.get('BINPKG_FORMAT',
+				self.settings.get("BINPKG_FORMAT", "xpak"))
+		else:
+			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+
 		if binpkg_format == "xpak":
 			filename_format = "%s-%s.xpak"
 		elif binpkg_format == "gpkg":
