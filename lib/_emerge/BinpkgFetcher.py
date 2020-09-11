@@ -11,6 +11,7 @@ import stat
 import sys
 import portage
 from portage import os
+from portage.const import SUPPORTED_GENTOO_BINPKG_FORMATS
 from portage.exception import FileNotFound, InvalidBinaryPackageFormat
 from portage.util._async.AsyncTaskFuture import AsyncTaskFuture
 from portage.util._pty import _create_pty_or_pipe
@@ -111,21 +112,24 @@ class _BinpkgFetcherProcess(SpawnProcess):
 
 		# urljoin doesn't work correctly with
 		# unrecognized protocols like sftp
+		fetchcommand = None
+		resumecommand = None
 		if bintree._remote_has_index:
-			instance_key = bintree.dbapi._instance_key(pkg.cpv)
-			rel_uri = bintree._remotepkgs[instance_key].get("PATH")
-			binpkg_format = bintree._remotepkgs[instance_key].get(
-				"BINPKG_FORMAT", "xpak")
-			if binpkg_format not in ("xpak", "gpkg"):
+			remote_metadata = bintree._remotepkgs[
+				bintree.dbapi._instance_key(pkg.cpv)]
+			binpkg_format = remote_metadata.get("BINPKG_FORMAT", "xpak")
+			if binpkg_format not in SUPPORTED_GENTOO_BINPKG_FORMATS: 
 				raise InvalidBinaryPackageFormat(binpkg_format)
+			rel_uri = remote_metadata.get("PATH")
 			if not rel_uri:
 				if binpkg_format == "xpak":
 					rel_uri = pkg.cpv + ".tbz2"
 				elif binpkg_format == "gpkg":
 					rel_uri = pkg.cpv + ".gpkg.tar"
-			remote_base_uri = bintree._remotepkgs[
-				instance_key]["BASE_URI"]
+			remote_base_uri = remote_metadata["BASE_URI"]
 			uri = remote_base_uri.rstrip("/") + "/" + rel_uri.lstrip("/")
+			fetchcommand = remote_metadata.get('FETCHCOMMAND')
+			resumecommand = remote_metadata.get('RESUMECOMMAND')
 		else:
 			raise FileNotFound("Binary packages index not found")
 
@@ -135,13 +139,19 @@ class _BinpkgFetcherProcess(SpawnProcess):
 			self._async_wait()
 			return
 
-		protocol = urllib_parse_urlparse(uri)[0]
-		fcmd_prefix = "FETCHCOMMAND"
+		fcmd = None
 		if resume:
-			fcmd_prefix = "RESUMECOMMAND"
-		fcmd = settings.get(fcmd_prefix + "_" + protocol.upper())
-		if not fcmd:
-			fcmd = settings.get(fcmd_prefix)
+			fcmd = resumecommand
+		else:
+			fcmd = fetchcommand
+		if fcmd is None:
+			protocol = urllib_parse_urlparse(uri)[0]
+			fcmd_prefix = "FETCHCOMMAND"
+			if resume:
+				fcmd_prefix = "RESUMECOMMAND"
+			fcmd = settings.get(fcmd_prefix + "_" + protocol.upper())
+			if not fcmd:
+				fcmd = settings.get(fcmd_prefix)
 
 		fcmd_vars = {
 			"DISTDIR" : os.path.dirname(pkg_path),
