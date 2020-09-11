@@ -33,7 +33,7 @@ class BinpkgFetcher(CompositeTask):
 			binpkg_format = bintree._remotepkgs[instance_key].get(
 				"BINPKG_FORMAT", "xpak")
 			if binpkg_path:
-				self.pkg_path = os.path.basename(binpkg_path) + ".partial"
+				self.pkg_path = binpkg_path + ".partial"
 			else:
 				self.pkg_path = pkg.root_config.trees["bintree"].getname(
 					pkg.cpv, binpkg_format=binpkg_format) + ".partial"
