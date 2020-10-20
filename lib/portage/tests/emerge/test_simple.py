@@ -7,8 +7,7 @@ import sys
 
 import portage
 from portage import shutil, os
-from portage import _unicode_decode
-from portage.const import (BASH_BINARY,  BINREPOS_CONF_FILE, PORTAGE_PYM_PATH,
+from portage.const import (BASH_BINARY, BINREPOS_CONF_FILE, PORTAGE_PYM_PATH,
 	USER_CONFIG_PATH, SUPPORTED_GENTOO_BINPKG_FORMATS)
 from portage.cache.mappings import Mapping
 from portage.process import find_binary
@@ -579,8 +578,7 @@ move dev-util/git dev-vcs/git
 					output, _err = yield proc.communicate()
 					yield proc.wait()
 					if proc.returncode != os.EX_OK:
-						for line in output:
-							sys.stderr.write(_unicode_decode(line))
+						portage.writemsg(output)
 
 				self.assertEqual(os.EX_OK, proc.returncode,
 					"emerge failed with args %s" % (args,))
