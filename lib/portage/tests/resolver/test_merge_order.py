@@ -492,10 +492,11 @@ class MergeOrderTestCase(TestCase):
 				mergelist = ['x11-base/xorg-server-1.14.1', 'media-libs/mesa-9.1.3']),
 		)
 
-		playground = ResolverPlayground(ebuilds=ebuilds, installed=installed)
+		playground = ResolverPlayground(ebuilds=ebuilds, installed=installed, debug=True)
 		try:
 			for test_case in test_cases:
 				playground.run_TestCase(test_case)
 				self.assertEqual(test_case.test_success, True, test_case.fail_msg)
 		finally:
+			playground.debug = False
 			playground.cleanup()

@@ -4,7 +4,11 @@
 from _emerge.AbstractDepPriority import AbstractDepPriority
 class DepPriority(AbstractDepPriority):
 
-	__slots__ = ("satisfied", "optional", "ignored")
+	__slots__ = ("ignored", "maybe_satisfied", "optional")
+
+	def __init__(self, **kwargs):
+		kwargs.pop('satisfied', None)
+		super(DepPriority, self).__init__(**kwargs)
 
 	def __int__(self):
 		"""
@@ -53,3 +57,11 @@ class DepPriority(AbstractDepPriority):
 		if self.runtime_post:
 			return "runtime_post"
 		return "soft"
+
+	@property
+	def satisfied(self):
+		return None
+
+	@satisfied.setter
+	def satisfied(self, value):
+		self.maybe_satisfied = value

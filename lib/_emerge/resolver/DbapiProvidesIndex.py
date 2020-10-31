@@ -69,6 +69,11 @@ class PackageDbapiProvidesIndex(DbapiProvidesIndex):
 		self._db.clear()
 		self._provides_index.clear()
 
+	def copy(self):
+		obj = PackageDbapiProvidesIndex(self._db.copy())
+		obj._provides_index = self._provides_index.copy()
+		return obj
+
 	def __bool__(self):
 		return bool(self._db)
 

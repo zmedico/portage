@@ -7637,6 +7637,13 @@ class depgraph:
 				if isinstance(node, Package) \
 				and node.operation == 'merge'], scheduler_graph)
 
+		# Track installed state with PackageVirtualDbapi instances copied
+		# from FakeVartree instances (these are wrapped with
+		# PackageDbapiProvidesIndex when soname deps are enabled).
+		installed_state = {}
+		for root in self._frozen_config.trees:
+			installed_state[root] = self._frozen_config.trees[root]["vartree"].dbapi.copy()
+
 		mygraph=self._dynamic_config.digraph.copy()
 
 		removed_nodes = set()
@@ -8271,6 +8278,18 @@ class depgraph:
 					continue
 
 			if not selected_nodes:
+				# TODO: Check if a cycle can be broken by currently installed packages,
+				# but make sure that the installed packages have satisfied dependencies
+				# in order to fix bug 199856. Use installed_state to create a temporary
+				# depgraph of installed packages for the current state (similar to a
+				# --depclean graph), and verify that dependencies are satisfied down to
+				# a depth corresponding to the current --deep setting. Once a package
+				# with dependencies satisfied by installed packages is chosen to merge,
+				# any future actions which would upgrade or uninstall the relevant
+				# installed packages must be marked as dependent on completion of the
+				# chosen merge in order to ensure that its dependencies do not mutate
+				# while it is in the process of merging.
+
 				self._dynamic_config._circular_deps_for_display = mygraph
 
 				unsolved_cycle = False
@@ -8303,6 +8322,7 @@ class depgraph:
 			prefer_asap = True
 			drop_satisfied = False
 
+			# TODO: Update installed_state with these changes.
 			mygraph.difference_update(selected_nodes)
 
 			for node in selected_nodes:
