@@ -291,6 +291,7 @@ class ResolverPlayground:
 			metadata["repository"] = repo
 			metadata["CATEGORY"] = cat
 			metadata["PF"] = pf
+			metadata["BINPKG_FORMAT"] = binpkg_format
 
 			repo_dir = self.pkgdir
 			category_dir = os.path.join(repo_dir, cat)

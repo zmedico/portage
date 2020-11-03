@@ -27,6 +27,7 @@ class test_gpkg_gpg_case(TestCase):
 				(
 					'FEATURES="${FEATURES} binpkg-signing '
 					'binpkg-request-signature"',
+					'BINPKG_FORMAT="gpkg"',
 				),
 			}
 		)
@@ -74,6 +75,7 @@ class test_gpkg_gpg_case(TestCase):
 				(
 					'FEATURES="${FEATURES} binpkg-signing '
 					'binpkg-request-signature"',
+					'BINPKG_FORMAT="gpkg"',
 				),
 			}
 		)
@@ -123,6 +125,7 @@ class test_gpkg_gpg_case(TestCase):
 				(
 					'FEATURES="${FEATURES} binpkg-signing '
 					'binpkg-ignore-signature"',
+					'BINPKG_FORMAT="gpkg"',
 				),
 			}
 		)
@@ -170,6 +173,7 @@ class test_gpkg_gpg_case(TestCase):
 				(
 					'FEATURES="${FEATURES} binpkg-signing '
 					'-binpkg-request-signature"',
+					'BINPKG_FORMAT="gpkg"',
 				),
 			}
 		)
@@ -218,6 +222,7 @@ class test_gpkg_gpg_case(TestCase):
 				(
 					'FEATURES="${FEATURES} binpkg-signing '
 					'binpkg-request-signature"',
+					'BINPKG_FORMAT="gpkg"',
 				),
 			}
 		)
@@ -280,6 +285,7 @@ HWhcS+9vk1Q4/qMk2Q4=
 				(
 					'FEATURES="${FEATURES} binpkg-signing '
 					'binpkg-request-signature"',
+					'BINPKG_FORMAT="gpkg"',
 
 					'BINPKG_GPG_UNLOCK_COMMAND='
 					'"/usr/bin/gpg --detach-sig --armor --batch --no-tty --yes '
@@ -332,6 +338,7 @@ HWhcS+9vk1Q4/qMk2Q4=
 				(
 					'FEATURES="${FEATURES} binpkg-signing '
 					'binpkg-request-signature"',
+					'BINPKG_FORMAT="gpkg"',
 				),
 			}
 		)
