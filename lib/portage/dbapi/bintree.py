@@ -83,8 +83,8 @@ class bindbapi(fakedbapi):
 		self.move_ent = mybintree.move_ent
 		# Selectively cache metadata in order to optimize dep matching.
 		self._aux_cache_keys = set(
-			["BDEPEND", "BUILD_ID", "BUILD_TIME", "CHOST", "DEFINED_PHASES",
-			"DEPEND", "EAPI", "IUSE", "KEYWORDS",
+			["BDEPEND", "BINPKG_FORMAT", "BUILD_ID", "BUILD_TIME", "CHOST",
+			"DEFINED_PHASES", "DEPEND", "EAPI", "IUSE", "KEYWORDS",
 			"LICENSE", "MD5", "PDEPEND", "PROPERTIES",
 			"PROVIDES", "RDEPEND", "repository", "REQUIRES", "RESTRICT",
 			"SIZE", "SLOT", "USE", "_mtime_"
@@ -1302,6 +1302,21 @@ class binarytree:
 				noiselevel=-1)
 			return
 		metadata = self._read_metadata(full_path, s)
+
+		if full_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
+			metadata["BINPKG_FORMAT"] = "xpak"
+		elif full_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
+			metadata["BINPKG_FORMAT"] = "gpkg"
+		else:
+			# check if extra temporary extension exists
+			_filename = os.path.splitext(full_path)[0]
+			if _filename.endswith(SUPPORTED_XPAK_EXTENSIONS):
+				metadata["BINPKG_FORMAT"] = "xpak"
+			elif _filename.endswith(SUPPORTED_GPKG_EXTENSIONS):
+				metadata["BINPKG_FORMAT"] = "gpkg"
+			else:
+				raise InvalidBinaryPackageFormat(full_path)
+
 		invalid_depend = False
 		try:
 			self._eval_use_flags(cpv, metadata)
@@ -1535,8 +1550,7 @@ class binarytree:
 
 		pkg_path = self.getname(cpv)
 		if hasattr(cpv, "_metadata"):
-			binpkg_format = cpv._metadata.get('BINPKG_FORMAT',
-				self.settings.get("BINPKG_FORMAT", "xpak"))
+			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', "xpak")
 		else:
 			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 
@@ -1738,8 +1752,9 @@ class binarytree:
 
 		if binpkg_format is None:
 			if hasattr(cpv, "_metadata"):
-				binpkg_format = cpv._metadata.get('BINPKG_FORMAT',
-					self.settings.get("BINPKG_FORMAT", "xpak"))
+				binpkg_format = cpv._metadata.get('BINPKG_FORMAT', "xpak")
+				if not binpkg_format:
+					binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 			else:
 				binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 
@@ -1807,8 +1822,7 @@ class binarytree:
 
 	def _allocate_filename(self, cpv):
 		if hasattr(cpv, "_metadata"):
-			binpkg_format = cpv._metadata.get('BINPKG_FORMAT',
-				self.settings.get("BINPKG_FORMAT", "xpak"))
+			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', "xpak")
 		else:
 			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 
@@ -1832,8 +1846,7 @@ class binarytree:
 		build_id = max_build_id + 1
 
 		if hasattr(cpv, "_metadata"):
-			binpkg_format = cpv._metadata.get('BINPKG_FORMAT',
-				self.settings.get("BINPKG_FORMAT", "xpak"))
+			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', "xpak")
 		else:
 			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 

@@ -30,7 +30,7 @@ class Package(Task):
 		"_validated_atoms", "_visible")
 
 	metadata_keys = [
-		"BDEPEND",
+		"BDEPEND", "BINPKG_FORMAT",
 		"BUILD_ID", "BUILD_TIME", "CHOST", "COUNTER", "DEFINED_PHASES",
 		"DEPEND", "EAPI", "INHERITED", "IUSE", "KEYWORDS",
 		"LICENSE", "MD5", "PDEPEND", "PROVIDES",
