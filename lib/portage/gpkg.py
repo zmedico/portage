@@ -733,9 +733,10 @@ class gpkg:
 				with tarfile.open(mode='r|', fileobj=image_tar) as image:
 					try:
 						image.extractall(decompress_dir)
-					except:
+					except Exception:
 						e = sys.exc_info()[0]
 						writemsg(colorize("BAD", "!!!" + "\n" + e))
+						raise
 					finally:
 						image_tar.kill()
 
