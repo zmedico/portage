@@ -314,7 +314,8 @@ call_has_and_best_version() {
 			foo_filename = "foo-0.gpkg.tar"
 
 		test_commands = (
-			emerge_cmd + ("--usepkgonly", "--root", cross_root, "--quickpkg-direct=y", "dev-libs/A"),
+			emerge_cmd + ("--usepkgonly", "--root", cross_root, "--quickpkg-direct=y", "--quickpkg-direct-root", "/", "dev-libs/A"),
+			emerge_cmd + ("--usepkgonly", "--quickpkg-direct=y", "--quickpkg-direct-root", cross_root, "dev-libs/A"),
 			env_update_cmd,
 			portageq_cmd + ("envvar", "-v", "CONFIG_PROTECT", "EROOT",
 				"PORTAGE_CONFIGROOT", "PORTAGE_TMPDIR", "USERLAND"),
