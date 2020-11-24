@@ -301,7 +301,7 @@ class bindbapi(fakedbapi):
 
 		pkg_path = self.bintree.getname(cpv)
 		if pkg_path is not None:
-			if pkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
+			if cpv._metadata['BINPKG_FORMAT'] == 'xpak':
 				extractor = BinpkgExtractorAsync(
 					background=settings.get('PORTAGE_BACKGROUND') == '1',
 					env=settings.environ(),
@@ -315,7 +315,7 @@ class bindbapi(fakedbapi):
 				yield extractor.async_wait()
 				if extractor.returncode != os.EX_OK:
 					raise PortageException("Error Extracting '{}'".format(pkg_path))
-			elif pkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
+			elif cpv._metadata['BINPKG_FORMAT'] == 'gpkg':
 				yield loop.run_in_executor(ForkExecutor(loop=loop),
 					portage.gpkg.gpkg(self.settings, cpv, pkg_path) \
 						.decompress, dest_dir)
@@ -1302,6 +1302,7 @@ class binarytree:
 				noiselevel=-1)
 			return
 		metadata = self._read_metadata(full_path, s)
+		print(metadata)
 
 		if full_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
 			metadata["BINPKG_FORMAT"] = "xpak"
