@@ -43,7 +43,9 @@ class GPG:
 				# GPG does not need to ask password, so can be ignored.
 				writemsg(colorize("WARN", str(e)) + '\n')
 
-			return_code = os.system(self.GPG_unlock_command)
+			cmd = shlex_split(varexpand(self.GPG_unlock_command,
+				mydict=self.settings))
+			return_code = subprocess.Popen(cmd).wait()
 
 			if return_code == os.EX_OK:
 				writemsg_stdout(colorize("GOOD", "unlocked") + '\n')
