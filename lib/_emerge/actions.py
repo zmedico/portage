@@ -33,8 +33,7 @@ from portage import os
 from portage import shutil
 from portage import _encodings, _unicode_decode
 from portage.binrepo.config import BinRepoConfigLoader
-from portage.const import (BINREPOS_CONF_FILE, _DEPCLEAN_LIB_CHECK_DEFAULT,
-	SUPPORTED_XPAK_EXTENSIONS, SUPPORTED_GPKG_EXTENSIONS)
+from portage.const import (BINREPOS_CONF_FILE, _DEPCLEAN_LIB_CHECK_DEFAULT)
 from portage.dbapi.dep_expand import dep_expand
 from portage.dbapi._expand_new_virt import expand_new_virt
 from portage.dbapi.IndexedPortdb import IndexedPortdb
@@ -63,6 +62,7 @@ from portage.localization import _
 from portage.metadata import action_metadata
 from portage.emaint.main import print_results
 from portage.gpg import GPG
+from portage.binpkg import get_binpkg_format
 
 from _emerge.clear_caches import clear_caches
 from _emerge.create_depgraph_params import create_depgraph_params
@@ -2023,10 +2023,13 @@ def action_info(settings, trees, myopts, myfiles):
 			elif pkg_type == "binary":
 				binpkg_file = bindb.bintree.getname(pkg.cpv)
 				ebuild_file_name = pkg.cpv.split("/")[1] + ".ebuild"
-				if binpkg_file.endswith(SUPPORTED_XPAK_EXTENSIONS):
+				binpkg_format = pkg.cpv._metadata.get('BINPKG_FORMAT', None)
+				if not binpkg_format:
+					binpkg_format = get_binpkg_format(binpkg_file)
+				if binpkg_format == "xpak":
 					ebuild_file_contents = portage.xpak.tbz2(binpkg_file)\
 						.getfile(ebuild_file_name)
-				elif binpkg_file.endswith(SUPPORTED_GPKG_EXTENSIONS):
+				elif binpkg_format == "gpkg":
 					ebuild_file_contents = portage.gpkg.gpkg(settings,
 						pkg.cpv, binpkg_file).get_metadata(ebuild_file_name)
 				else:

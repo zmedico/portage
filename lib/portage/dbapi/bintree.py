@@ -35,6 +35,7 @@ from portage.package.ebuild.profile_iuse import iter_iuse_vars
 from portage.util.futures import asyncio
 from portage.util.futures.compat_coroutine import coroutine
 from portage.util.futures.executor.fork import ForkExecutor
+from portage.binpkg import get_binpkg_format
 from portage import _movefile
 from portage import os
 from portage import _encodings
@@ -153,10 +154,13 @@ class bindbapi(fakedbapi):
 				st = os.lstat(binpkg_path)
 			except OSError:
 				raise KeyError(mycpv)
-			if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
+			binpkg_format = mycpv._metadata.get('BINPKG_FORMAT', None)
+			if not binpkg_format:
+				binpkg_format = get_binpkg_format(binpkg_path)
+			if binpkg_format == "xpak":
 				metadata_bytes = portage.xpak.tbz2(binpkg_path).get_data()
 				decode_metadata_name = False
-			elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
+			elif binpkg_format == "gpkg":
 				metadata_bytes = portage.gpkg.gpkg(self.settings, mycpv,
 					binpkg_path).get_metadata()
 				decode_metadata_name = True
@@ -217,11 +221,14 @@ class bindbapi(fakedbapi):
 		if not os.path.exists(binpkg_path):
 			raise KeyError(cpv)
 
-		if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
+		binpkg_format = cpv._metadata.get('BINPKG_FORMAT', None)
+		if not binpkg_format:
+			binpkg_format = get_binpkg_format(binpkg_path)
+		if binpkg_format == "xpak":
 			mytbz2 = portage.xpak.tbz2(binpkg_path)
 			mydata = mytbz2.get_data()
 			encoding_key = True
-		elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
+		elif binpkg_format == "gpkg":
 			mybinpkg = portage.gpkg.gpkg(self.settings, cpv, binpkg_path)
 			mydata = mybinpkg.get_metadata()
 			encoding_key = False
@@ -240,9 +247,9 @@ class bindbapi(fakedbapi):
 		for k, v in list(mydata.items()):
 			if not v:
 				del mydata[k]
-		if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
+		if binpkg_format == "xpak":
 			mytbz2.recompose_mem(portage.xpak.xpak_mem(mydata))
-		elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
+		elif binpkg_format == "gpkg":
 			mybinpkg.update_metadata(mydata)
 		else:
 			raise InvalidBinaryPackageFormat("Unknown binary package format %s"
@@ -273,13 +280,19 @@ class bindbapi(fakedbapi):
 			yield add_pkg._db.unpack_metadata(pkg, dest_dir, loop=loop)
 		else:
 			binpkg_file = self.bintree.getname(cpv)
-			if binpkg_file.endswith(SUPPORTED_XPAK_EXTENSIONS):
+			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', None)
+			if not binpkg_format:
+				binpkg_format = get_binpkg_format(binpkg_path)
+			if binpkg_format == "xpak":
 				yield loop.run_in_executor(ForkExecutor(loop=loop),
 					portage.xpak.tbz2(binpkg_file).unpackinfo, dest_dir)
-			elif binpkg_file.endswith(SUPPORTED_GPKG_EXTENSIONS):
+			elif binpkg_format == "gpkg":
 				yield loop.run_in_executor(ForkExecutor(loop=loop),
 					portage.gpkg.gpkg(self.settings, cpv, binpkg_file) \
 						.unpack_metadata, dest_dir)
+			else:
+				raise InvalidBinaryPackageFormat(
+					"Unknown binary package format %s" % binpkg_file)
 
 	@coroutine
 	def unpack_contents(self, pkg, dest_dir, loop=None):
@@ -547,11 +560,14 @@ class binarytree:
 				continue
 
 			moves += 1
-			if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
+			binpkg_format = mycpv._metadata.get('BINPKG_FORMAT', None)
+			if not binpkg_format:
+				binpkg_format = get_binpkg_format(binpkg_path)
+			if binpkg_format == "xpak":
 				mytbz2 = portage.xpak.tbz2(binpkg_path)
 				mydata = mytbz2.get_data()
 				decode_metadata_name = False
-			elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
+			elif binpkg_format == "gpkg":
 				mybinpkg = portage.gpkg.gpkg(self.settings, mycpv, binpkg_path)
 				mydata = mybinpkg.get_metadata()
 				decode_metadata_name = True
@@ -581,9 +597,9 @@ class binarytree:
 					mydata[_unicode_encode(mynewpkg + '.ebuild',
 						encoding=_encodings['repo.content'])] = ebuild_data
 
-			if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
+			if binpkg_format == "xpak":
 				mytbz2.recompose_mem(portage.xpak.xpak_mem(mydata))
-			elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
+			elif binpkg_format == "gpkg":
 				mybinpkg.update_metadata(mydata)
 			else:
 				continue
@@ -600,11 +616,11 @@ class binarytree:
 			new_path = self.getname(mynewcpv)
 			self._pkg_paths[
 				self.dbapi._instance_key(mynewcpv)] = new_path[len(self.pkgdir)+1:]
-			if binpkg_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
+			if binpkg_format == "xpak":
 				if new_path != binpkg_path:
 					self._ensure_dir(os.path.dirname(new_path))
 					_movefile(binpkg_path, new_path, mysettings=self.settings)
-			elif binpkg_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
+			elif binpkg_format == "gpkg":
 				if new_path != binpkg_path:
 					self._ensure_dir(os.path.dirname(new_path))
 					_movefile(binpkg_path, new_path, mysettings=self.settings)
@@ -782,11 +798,10 @@ class binarytree:
 							encoding=_encodings["fs"], errors="strict")
 					except UnicodeDecodeError:
 						continue
-					if not myfile.endswith(SUPPORTED_XPAK_EXTENSIONS
-						+ SUPPORTED_GPKG_EXTENSIONS):
-						continue
 					mypath = os.path.join(mydir, myfile)
 					full_path = os.path.join(self.pkgdir, mypath)
+					if not get_binpkg_format(full_path):
+						continue
 					s = os.lstat(full_path)
 
 					if not stat.S_ISREG(s.st_mode):
@@ -1302,21 +1317,9 @@ class binarytree:
 				noiselevel=-1)
 			return
 		metadata = self._read_metadata(full_path, s)
-		print(metadata)
 
-		if full_path.endswith(SUPPORTED_XPAK_EXTENSIONS):
-			metadata["BINPKG_FORMAT"] = "xpak"
-		elif full_path.endswith(SUPPORTED_GPKG_EXTENSIONS):
-			metadata["BINPKG_FORMAT"] = "gpkg"
-		else:
-			# check if extra temporary extension exists
-			_filename = os.path.splitext(full_path)[0]
-			if _filename.endswith(SUPPORTED_XPAK_EXTENSIONS):
-				metadata["BINPKG_FORMAT"] = "xpak"
-			elif _filename.endswith(SUPPORTED_GPKG_EXTENSIONS):
-				metadata["BINPKG_FORMAT"] = "gpkg"
-			else:
-				raise InvalidBinaryPackageFormat(full_path)
+		binpkg_format = get_binpkg_format(full_path)
+		metadata["BINPKG_FORMAT"] = binpkg_format
 
 		invalid_depend = False
 		try:
@@ -1367,9 +1370,7 @@ class binarytree:
 
 			basename = os.path.basename(full_path)
 			pf = catsplit(cpv)[1]
-			if (build_id is None and not fetched and
-				(basename.endswith(".xpak") or
-				basename.endswith(SUPPORTED_GPKG_EXTENSIONS))):
+			if (build_id is None) and (not fetched) and binpkg_format:
 				# Apply the newly assigned BUILD_ID. This is intended
 				# to occur only for locally built packages. If the
 				# package was fetched, we want to preserve its
@@ -1379,13 +1380,13 @@ class binarytree:
 				metadata["BUILD_ID"] = str(build_id)
 				cpv = _pkg_str(cpv, metadata=metadata,
 					settings=self.settings, db=self.dbapi)
-				if basename.endswith(".xpak"):
+				if binpkg_format == "xpak":
 					binpkg = portage.xpak.tbz2(full_path)
 					binary_data = binpkg.get_data()
 					binary_data[b"BUILD_ID"] = _unicode_encode(
 						metadata["BUILD_ID"])
 					binpkg.recompose_mem(portage.xpak.xpak_mem(binary_data))
-				elif basename.endswith(SUPPORTED_GPKG_EXTENSIONS):
+				elif binpkg_format == "gpkg":
 					binpkg = portage.gpkg.gpkg(self.settings, cpv, full_path)
 					binpkg_metadata = binpkg.get_metadata()
 					binpkg_metadata["BUILD_ID"] = _unicode_encode(
@@ -1438,23 +1439,15 @@ class binarytree:
 		# xpak return key as binary, gpkg return key as str
 		decode_metadata_name = True
 
-		if filename.endswith(SUPPORTED_XPAK_EXTENSIONS):
+		binpkg_format = get_binpkg_format(filename)
+		if binpkg_format == "xpak":
 			binpkg_metadata = portage.xpak.tbz2(filename).get_data()
-		elif filename.endswith(SUPPORTED_GPKG_EXTENSIONS):
+		elif binpkg_format == "gpkg":
 			binpkg_metadata = portage.gpkg.gpkg(
 				self.settings, None, filename).get_metadata()
 			decode_metadata_name = False
 		else:
-			# check if extra temporary extension exists
-			_filename = os.path.splitext(filename)[0]
-			if _filename.endswith(SUPPORTED_XPAK_EXTENSIONS):
-				binpkg_metadata = portage.xpak.tbz2(filename).get_data()
-			elif _filename.endswith(SUPPORTED_GPKG_EXTENSIONS):
-				binpkg_metadata = portage.gpkg.gpkg(
-					self.settings, None, filename).get_metadata()
-				decode_metadata_name = False
-			else:
-				raise InvalidBinaryPackageFormat(filename)
+			raise InvalidBinaryPackageFormat(filename)
 
 		for k in keys:
 			if k == "_mtime_":

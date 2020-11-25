@@ -48,6 +48,7 @@ from portage.util.digraph import digraph
 from portage.util.futures import asyncio
 from portage.util._async.TaskScheduler import TaskScheduler
 from portage.versions import _pkg_str, catpkgsplit
+from portage.binpkg import get_binpkg_format
 
 from _emerge.AtomArg import AtomArg
 from _emerge.Blocker import Blocker
@@ -4049,14 +4050,18 @@ class depgraph:
 						writemsg("\n\n!!! Binary package '"+str(x)+"' does not exist.\n", noiselevel=-1)
 						writemsg("!!! Please ensure the binpkg exists as specified.\n\n", noiselevel=-1)
 						return 0, myfavorites
-				if x.endswith(".tbz2"):
+				binpkg_format = get_binpkg_format(x)
+				if binpkg_format == "xpak":
 					mytbz2=portage.xpak.tbz2(x)
 					mykey = None
 					cat = mytbz2.getfile("CATEGORY")
-				elif x.endswith(SUPPORTED_GPKG_EXTENSIONS):
+				elif binpkg_format == "gpkg":
 					mygpkg = portage.gpkg.gpkg(self.frozen_config, None, x)
 					mykey = None
 					cat = mygpkg.get_metadata("CATEGORY")
+				else:
+					raise InvalidBinaryPackageFormat(x)
+
 				if cat is not None:
 					cat = _unicode_decode(cat.strip(),
 						encoding=_encodings['repo.content'])
