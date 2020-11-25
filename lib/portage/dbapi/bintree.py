@@ -798,10 +798,11 @@ class binarytree:
 							encoding=_encodings["fs"], errors="strict")
 					except UnicodeDecodeError:
 						continue
+					if not myfile.endswith(SUPPORTED_XPAK_EXTENSIONS
+						+ SUPPORTED_GPKG_EXTENSIONS):
+						continue
 					mypath = os.path.join(mydir, myfile)
 					full_path = os.path.join(self.pkgdir, mypath)
-					if not get_binpkg_format(full_path):
-						continue
 					s = os.lstat(full_path)
 
 					if not stat.S_ISREG(s.st_mode):
