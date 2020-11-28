@@ -282,7 +282,7 @@ class bindbapi(fakedbapi):
 			binpkg_file = self.bintree.getname(cpv)
 			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', None)
 			if not binpkg_format:
-				binpkg_format = get_binpkg_format(binpkg_path)
+				binpkg_format = get_binpkg_format(binpkg_file)
 			if binpkg_format == "xpak":
 				yield loop.run_in_executor(ForkExecutor(loop=loop),
 					portage.xpak.tbz2(binpkg_file).unpackinfo, dest_dir)
