@@ -193,18 +193,23 @@
 # You need uncomment related commands and set "USER" and "SIGN_KEY" to yours.
 #
 # Binary package GPG unlock command
-# You only need this if you need to enter the GPG password manually.
-#BINPKG_GPG_UNLOCK_COMMAND="sudo -u USER -- /usr/bin/gpg --detach-sig --armor --batch --yes --digest-algo SHA256 --local-user SIGN_KEY --output /dev/null /dev/null"
+# Only for package signing.
+# You need this if you have to enter the GPG password manually AND/OR
+# You need to use gpg-keepalive feature to avoid GPG session expired.
+#BINPKG_GPG_UNLOCK_COMMAND="flock /run/lock/binpkg-gpg.lock sudo -u USER -- /usr/bin/gpg --detach-sig --armor --batch --yes --digest-algo SHA256 --local-user SIGN_KEY --output /dev/null /dev/null"
 #
 # Binary package GPG signing command
+# Only for package signing.
 # For security reasons, NOT recommended signing as root user.
-#BINPKG_GPG_SIGNING_COMMAND="sudo -u USER -- /usr/bin/gpg --detach-sig --armor --batch --yes --no-tty --digest-algo SHA256 --local-user SIGN_KEY"
+# Use flock to avoid GPG race condition.
+#BINPKG_GPG_SIGNING_COMMAND="flock /run/lock/binpkg-gpg.lock sudo -u USER -- /usr/bin/gpg --detach-sig --armor --batch --yes --no-tty --digest-algo SHA256 --local-user SIGN_KEY"
 #
-# Binary package GPG verification command
+# Binary package GPG verify command
+# Only for package verification.
 # You can also use --homedir "PATH/TO/.gnupg" without sudo or non-standard path
 # \"\${SIGN_FILE}\" is needed and must be the first file to give as signature.
 # "-" must be the last parameter to tell GPG read data from stdin.
-#BINPKG_GPG_VERIFY_COMMAND="sudo -u USER -- /usr/bin/gpg --verify --batch --no-tty --yes \"\${SIGN_FILE}\" -"
+#BINPKG_GPG_VERIFY_COMMAND="/usr/bin/gpg --verify --batch --no-tty --homedir /root/.gnupg --status-fd 1 \"\${SIGN_FILE}\" -"
 
 # Synchronizing Portage
 # =====================
