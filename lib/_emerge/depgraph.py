@@ -3536,6 +3536,29 @@ class depgraph:
 		finally:
 			self._dynamic_config._autounmask = _autounmask_backup
 
+	def _adjust_priority(self, atom, child, priority):
+		"""
+		Initialize priority new_rev, new_ver, and new_slot attributes.
+		"""
+		if atom.blocker:
+			return
+		if atom.slot_operator == "=":
+			if priority.buildtime:
+				priority.buildtime_slot_op = True
+			if priority.runtime:
+				priority.runtime_slot_op = True
+		if priority.satisfied and priority.satisfied is not child and \
+			priority.satisfied.installed and \
+			child and not child.installed:
+			if child.slot != priority.satisfied.slot or child.sub_slot != priority.satisfied.sub_slot:
+				priority.new_slot = True
+			if portage.vercmp(child.cpv.version, priority.satisfied.cpv.version) != 0:
+				if portage.vercmp('-'.join(child.cpv.cpv_split[2:-1]),
+					'-'.join(priority.satisfied.cpv.cpv_split[2:-1])) == 0:
+					priority.new_rev = True
+				else:
+					priority.new_ver = True
+
 	def _ignore_dependency(self, atom, pkg, child, dep, mypriority, recurse_satisfied):
 		"""
 		In some cases, dep_check will return deps that shouldn't
@@ -3546,19 +3569,8 @@ class depgraph:
 		Don't ignore dependencies if pkg has a slot operator dependency on the child
 		and the child has changed slot/sub_slot.
 		"""
-		if not mypriority.satisfied:
-			return False
-		slot_operator_rebuild = False
-		if atom.slot_operator == '=' and \
-			(pkg.root, pkg.slot_atom) in self._dynamic_config._slot_operator_replace_installed and \
-			mypriority.satisfied is not child and \
-			mypriority.satisfied.installed and \
-			child and \
-			not child.installed and \
-			(child.slot != mypriority.satisfied.slot or child.sub_slot != mypriority.satisfied.sub_slot):
-			slot_operator_rebuild = True
-
 		return not atom.blocker and \
+			mypriority.satisfied and \
 			not recurse_satisfied and \
 			mypriority.satisfied.visible and \
 			dep.child is not None and \
@@ -3629,13 +3641,6 @@ class depgraph:
 
 			mypriority = dep_priority.copy()
 			if not atom.blocker:
-
-				if atom.slot_operator == "=":
-					if mypriority.buildtime:
-						mypriority.buildtime_slot_op = True
-					if mypriority.runtime:
-						mypriority.runtime_slot_op = True
-
 				inst_pkgs = [inst_pkg for inst_pkg in
 					reversed(vardb.match_pkgs(atom))
 					if not reinstall_atoms.findAtomForPackage(inst_pkg,
@@ -3649,6 +3654,8 @@ class depgraph:
 					if not mypriority.satisfied:
 						# none visible, so use highest
 						mypriority.satisfied = inst_pkgs[0]
+
+				self._adjust_priority(atom, child, mypriority)
 
 			dep = Dependency(atom=atom,
 				blocker=atom.blocker, child=child, depth=depth, parent=pkg,
@@ -3725,6 +3732,8 @@ class depgraph:
 						# none visible, so use highest
 						virt_dep.priority.satisfied = inst_pkgs[0]
 
+					self._adjust_priority(virt_dep.atom, virt_dep.child, virt_dep.priority)
+
 				if not self._add_pkg(virt_pkg, virt_dep):
 					return 0
 
@@ -3754,6 +3763,8 @@ class depgraph:
 						if not mypriority.satisfied:
 							# none visible, so use highest
 							mypriority.satisfied = inst_pkgs[0]
+
+					self._adjust_priority(atom, child, mypriority)
 
 				# Dependencies of virtuals are considered to have the
 				# same depth as the virtual itself.
