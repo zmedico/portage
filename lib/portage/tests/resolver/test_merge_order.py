@@ -35,13 +35,13 @@ class MergeOrderTestCase(TestCase):
             "app-misc/circ-buildtime-c-1": {
                 "DEPEND": "app-misc/circ-buildtime-a",
             },
-            "app-misc/circ-buildtime-new-slot-a-1": {
+            "app-misc/circ-buildtime-new-slot-a-2": {
                 "EAPI": "7",
                 "DEPEND": "app-misc/circ-buildtime-new-slot-b",
                 "RDEPEND": "app-misc/circ-buildtime-new-slot-b",
-                "SLOT": "0",
+                "SLOT": "1",
             },
-            "app-misc/circ-buildtime-new-slot-b-1": {
+            "app-misc/circ-buildtime-new-slot-b-2": {
                 "EAPI": "7",
                 "DEPEND": "app-misc/circ-buildtime-new-slot-a",
                 "RDEPEND": "app-misc/circ-buildtime-new-slot-a",
@@ -774,8 +774,9 @@ class MergeOrderTestCase(TestCase):
                 ],
             ),
             # Test satisfied circular DEPEND/RDEPEND. Both deps are already
-            # satisfied by installed packages, but the dependency which is
-            # changing SLOT is given higher priority.
+            # satisfied by installed packages, and both are changing slots.
+            # Since both have the same priority, merge order is undefined.
+            # In this case, packages are sorted for deterministic results.
             ResolverPlaygroundTestCase(
                 [
                     "app-misc/circ-buildtime-new-slot-a",
@@ -784,8 +785,8 @@ class MergeOrderTestCase(TestCase):
                 success=True,
                 all_permutations=True,
                 mergelist=[
-                    "app-misc/circ-buildtime-new-slot-b-1",
-                    "app-misc/circ-buildtime-new-slot-a-1",
+                    "app-misc/circ-buildtime-new-slot-a-2",
+                    "app-misc/circ-buildtime-new-slot-b-2",
                 ],
             ),
             # Test prioritization of the find_smallest_cycle function, which should
@@ -812,6 +813,8 @@ class MergeOrderTestCase(TestCase):
                     "app-misc/circ-buildtime-slot-op-new-slot-b:2",
                     "app-misc/circ-buildtime-new-ver-a",
                     "app-misc/circ-buildtime-new-ver-b",
+                    "app-misc/circ-buildtime-new-slot-a",
+                    "app-misc/circ-buildtime-new-slot-b",
                 ],
                 success=True,
                 mergelist=[
@@ -826,29 +829,34 @@ class MergeOrderTestCase(TestCase):
                     "app-misc/blocker-buildtime-unbuilt-a-1",
                     "[uninstall]app-misc/installed-blocker-a-1",
                     "!app-misc/installed-blocker-a",
-                    "app-misc/circ-buildtime-new-ver-b-2",
-                    "app-misc/circ-buildtime-new-ver-a-1",
-                    "app-misc/circ-buildtime-slot-op-new-slot-b-2",
-                    "app-misc/circ-buildtime-slot-op-new-slot-a-1",
                     "app-misc/circ-direct-a-1",
                     "app-misc/circ-direct-b-1",
                     "x11-base/xorg-server-1.14.1",
                     "media-libs/mesa-9.1.3",
+                    "app-misc/circ-buildtime-new-ver-b-2",
+                    "app-misc/circ-buildtime-new-ver-a-1",
+                    "app-misc/circ-satisfied-a-1",
+                    "app-misc/circ-satisfied-b-1",
+                    "app-misc/circ-satisfied-c-1",
+                    "app-misc/circ-buildtime-new-slot-a-2",
+                    "app-misc/circ-buildtime-new-slot-b-2",
+                    "app-misc/circ-buildtime-slot-op-new-slot-b-2",
+                    "app-misc/circ-buildtime-slot-op-new-slot-a-1",
                     "app-misc/circ-buildtime-a-1",
                     "app-misc/circ-buildtime-b-1",
                     "app-misc/circ-buildtime-c-1",
                     "app-misc/some-app-c-1",
-                    "app-misc/circ-satisfied-a-1",
-                    "app-misc/circ-satisfied-b-1",
-                    "app-misc/circ-satisfied-c-1",
                 ],
             ),
         )
 
-        playground = ResolverPlayground(ebuilds=ebuilds, installed=installed)
+        playground = ResolverPlayground(
+            ebuilds=ebuilds, installed=installed, debug=True
+        )
         try:
             for test_case in test_cases:
                 playground.run_TestCase(test_case)
                 self.assertEqual(test_case.test_success, True, test_case.fail_msg)
         finally:
+            playground.debug = False
             playground.cleanup()

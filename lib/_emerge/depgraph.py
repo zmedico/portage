@@ -9331,7 +9331,7 @@ class depgraph:
 
             if not selected_nodes:
 
-                def find_smallest_cycle(mergeable_nodes, local_priority_range):
+                def find_smallest_cycle(mergeable_nodes, ignore_priority):
                     if prefer_asap and asap_nodes:
                         nodes = asap_nodes
                     else:
@@ -9347,36 +9347,26 @@ class depgraph:
                     # smallest cycle in order to try and identify and prefer
                     # these smaller independent cycles.
                     smallest_cycle = None
-                    ignore_priority = None
 
                     # Sort nodes for deterministic results.
                     nodes = sorted(nodes)
-                    for priority in (
-                        local_priority_range.ignore_priority[i]
-                        for i in range(
-                            local_priority_range.MEDIUM_POST,
-                            local_priority_range.MEDIUM_SOFT + 1,
-                        )
-                    ):
-                        for node in nodes:
-                            if not mygraph.parent_nodes(node):
+
+                    for node in nodes:
+                        if not mygraph.parent_nodes(node):
+                            continue
+                        selected_nodes = set()
+                        if gather_deps(
+                            ignore_priority, mergeable_nodes, selected_nodes, node
+                        ):
+                            if len(selected_nodes) == 1:
+                                # This is not a cycle. TODO: Confirm that a cycle is selected.
                                 continue
-                            selected_nodes = set()
-                            if gather_deps(
-                                priority, mergeable_nodes, selected_nodes, node
+                            if smallest_cycle is None or len(selected_nodes) < len(
+                                smallest_cycle
                             ):
-                                if smallest_cycle is None or len(selected_nodes) < len(
-                                    smallest_cycle
-                                ):
-                                    smallest_cycle = selected_nodes
-                                    ignore_priority = priority
+                                smallest_cycle = selected_nodes
 
-                        # Exit this loop with the lowest possible priority, which
-                        # minimizes the use of installed packages to break cycles.
-                        if smallest_cycle is not None:
-                            break
-
-                    return smallest_cycle, ignore_priority
+                    return smallest_cycle
 
                 priority_ranges = []
                 if priority_range is not DepPriorityNormalRange:
@@ -9386,15 +9376,23 @@ class depgraph:
                     priority_ranges.append(DepPrioritySatisfiedRange)
 
                 for local_priority_range in priority_ranges:
-                    mergeable_nodes = set(
-                        get_nodes(ignore_priority=local_priority_range.ignore_medium)
-                    )
-                    if mergeable_nodes:
-                        selected_nodes, ignore_priority = find_smallest_cycle(
-                            mergeable_nodes, local_priority_range
+                    for ignore_priority in (
+                        local_priority_range.ignore_priority[i]
+                        for i in range(
+                            local_priority_range.MEDIUM_POST,
+                            local_priority_range.MEDIUM + 1,
                         )
+                    ):
+                        mergeable_nodes = set(
+                            get_nodes(ignore_priority=ignore_priority)
+                        )
+                        selected_nodes = find_smallest_cycle(mergeable_nodes, None)
                         if selected_nodes:
                             break
+                    if selected_nodes:
+                        break
+                else:
+                    ignore_priority = None
 
                 if not selected_nodes:
                     if prefer_asap and asap_nodes:
@@ -9479,6 +9477,8 @@ class depgraph:
                             ignore_priority=ignore_priority
                         )
                         if leaves:
+                            # Sort leaves for deterministic results.
+                            leaves.sort()
                             cycle_digraph.difference_update(leaves)
                             selected_nodes.extend(leaves)
                             break
