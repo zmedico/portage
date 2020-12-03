@@ -112,6 +112,49 @@ class digraph:
 			del self.nodes[node]
 		self.order = order
 
+	def _get_priorities(edge):
+		"""
+		Return priorities of edge.
+
+		@param edge: (parent, child)
+		@type edge: tuple
+		@rtype: list
+		@return: list of DepPriority
+		"""
+		parent, child = edge
+		return tuple(self.nodes[parent][0][child])
+
+	def _sort_priorities(self, priority_key):
+		for node, node_info in self.nodes in self.nodes.items():
+			for child, priorities in node_info[0].items():
+				priorities.sort(key=priority_key)
+
+	def _iter_edges(self):
+		for parent in self.order:
+			for child in self.child_nodes(parent):
+				yield (parent, child)
+
+	class _edge_key:
+		def __init__(self, graph, parent, child):
+			self._graph = graph
+			self._parent = parent
+			self._child = child
+		def __lt__(self, other):
+			raise NotImplementedError
+		def __le__(self, other):
+			raise NotImplementedError
+		def __gt__(self, other):
+			raise NotImplementedError
+		def __ge__(self, other):
+			raise NotImplementedError
+		def __eq__(self, other):
+			raise NotImplementedError
+		def __ne__(self, other):
+			raise NotImplementedError
+
+	def sort_edges(self, priority_key):
+		raise NotImplementedError
+
 	def has_edge(self, child, parent):
 		"""
 		Return True if the given edge exists.

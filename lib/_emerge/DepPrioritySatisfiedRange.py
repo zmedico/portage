@@ -2,6 +2,23 @@
 # Distributed under the terms of the GNU General Public License v2
 
 from _emerge.DepPriority import DepPriority
+
+class _priority_rank:
+	def __init__(self, index):
+		self._index = index
+	def __lt__(self, other):
+		return self._index < other._index
+	def __le__(self, other):
+		return self._index <= other._index
+	def __gt__(self, other):
+		return self._index > other._index
+	def __ge__(self, other):
+		return self._index >= other._index
+	def __eq__(self, other):
+		return self._index == other._index
+	def __ne__(self, other):
+		return self._index != other._index
+
 class DepPrioritySatisfiedRange:
 	"""
 	DepPriority                         Index      Category
@@ -21,6 +38,14 @@ class DepPrioritySatisfiedRange:
 	MEDIUM_POST = 3
 	SOFT        = 1
 	NONE        = 0
+
+	@classmethod
+	def sort_key(cls, priority):
+		for i, ignore_priority in reversed(list(enumerate(cls.ignore_priority))):
+			if ignore_priority is None:
+				return _priority_rank(i)
+			elif not ignore_priority(priority):
+				return _priority_rank(i)
 
 	@classmethod
 	def _ignore_optional(cls, priority):
