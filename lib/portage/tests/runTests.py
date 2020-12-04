@@ -4,6 +4,7 @@
 # Distributed under the terms of the GNU General Public License v2
 
 import grp
+import multiprocessing
 import os
 import os.path as osp
 import platform
@@ -60,6 +61,7 @@ if insert_bin_path:
 	os.environ["PATH"] = ":".join(path)
 
 if __name__ == "__main__":
+	multiprocessing.set_start_method('spawn')
 	try:
 		sys.exit(tests.main())
 	finally:
