@@ -905,7 +905,6 @@ class binarytree:
 						else:
 							mypkg = mypkg[:-len(str(build_id))-1]
 					elif myfile.endswith(".gpkg.tar"):
-						invalid_name = False
 						build_id = self._parse_build_id(myfile)
 						if build_id > 0:
 							multi_instance = True
@@ -1381,23 +1380,25 @@ class binarytree:
 				# attributes, so that we can later distinguish that it
 				# is identical to its remote counterpart.
 				build_id = self._parse_build_id(basename)
-				metadata["BUILD_ID"] = str(build_id)
-				cpv = _pkg_str(cpv, metadata=metadata,
-					settings=self.settings, db=self.dbapi)
-				if binpkg_format == "xpak":
-					binpkg = portage.xpak.tbz2(full_path)
-					binary_data = binpkg.get_data()
-					binary_data[b"BUILD_ID"] = _unicode_encode(
-						metadata["BUILD_ID"])
-					binpkg.recompose_mem(portage.xpak.xpak_mem(binary_data))
-				elif binpkg_format == "gpkg":
-					binpkg = portage.gpkg.gpkg(self.settings, cpv, full_path)
-					binpkg_metadata = binpkg.get_metadata()
-					binpkg_metadata["BUILD_ID"] = _unicode_encode(
-						metadata["BUILD_ID"])
-					binpkg.update_metadata(binpkg_metadata)
-				else:
-					raise InvalidBinaryPackageFormat(basename)
+				if build_id > 0:
+					metadata["BUILD_ID"] = str(build_id)
+					cpv = _pkg_str(cpv, metadata=metadata,
+						settings=self.settings, db=self.dbapi)
+					if binpkg_format == "xpak":
+						if basename.endswith(".xpak"):
+							binpkg = portage.xpak.tbz2(full_path)
+							binary_data = binpkg.get_data()
+							binary_data[b"BUILD_ID"] = _unicode_encode(
+								metadata["BUILD_ID"])
+							binpkg.recompose_mem(portage.xpak.xpak_mem(binary_data))
+					elif binpkg_format == "gpkg":
+						binpkg = portage.gpkg.gpkg(self.settings, cpv, full_path)
+						binpkg_metadata = binpkg.get_metadata()
+						binpkg_metadata["BUILD_ID"] = _unicode_encode(
+							metadata["BUILD_ID"])
+						binpkg.update_metadata(binpkg_metadata)
+					else:
+						raise InvalidBinaryPackageFormat(basename)
 
 			self._file_permissions(full_path)
 			pkgindex = self._load_pkgindex()
