@@ -765,7 +765,7 @@ class binarytree:
 				pkgindex = self._new_pkgindex()
 			metadata = {}
 			basename_index = {}
-			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+			binpkg_format_default = self.settings.get("BINPKG_FORMAT", "xpak")
 			for d in pkgindex.packages:
 				cpv = _pkg_str(d["CPV"], metadata=d,
 					settings=self.settings, db=self.dbapi)
@@ -773,6 +773,7 @@ class binarytree:
 				metadata[_instance_key(cpv)] = d
 				path = d.get("PATH")
 				if not path:
+					binpkg_format = d.get("BINPKG_FORMAT", binpkg_format_default)
 					if binpkg_format == "xpak":
 						path = cpv + ".tbz2"
 					elif binpkg_format == "gpkg":
