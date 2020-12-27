@@ -814,9 +814,9 @@ class binarytree:
 
 					# Validate data from the package index and try to avoid
 					# reading the xpak if possible.
+					match = None
 					possibilities = basename_index.get(myfile)
 					if possibilities:
-						match = None
 						for d in possibilities:
 							try:
 								if int(d["_mtime_"]) != s[stat.ST_MTIME]:
@@ -858,9 +858,13 @@ class binarytree:
 							noiselevel=-1)
 						self.invalids.append(myfile[:-5])
 						continue
+
+					binpkg_format = None
+					if match:
+						binpkg_format = match.get("BINPKG_FORMAT", None)
 					pkg_metadata = self._read_metadata(full_path, s,
 						keys=chain(self.dbapi._aux_cache_keys,
-						("PF", "CATEGORY")))
+						("PF", "CATEGORY")), binpkg_format=binpkg_format)
 					mycat = pkg_metadata.get("CATEGORY", "")
 					mypf = pkg_metadata.get("PF", "")
 					slot = pkg_metadata.get("SLOT", "")
@@ -1320,9 +1324,9 @@ class binarytree:
 			writemsg(_("!!! Binary package does not exist: '%s'\n") % full_path,
 				noiselevel=-1)
 			return
-		metadata = self._read_metadata(full_path, s)
 
 		binpkg_format = get_binpkg_format(full_path)
+		metadata = self._read_metadata(full_path, s, binpkg_format=binpkg_format)
 		metadata["BINPKG_FORMAT"] = binpkg_format
 
 		invalid_depend = False
@@ -1420,7 +1424,7 @@ class binarytree:
 
 		return cpv
 
-	def _read_metadata(self, filename, st, keys=None):
+	def _read_metadata(self, filename, st, keys=None, binpkg_format=None):
 		"""
 		Read metadata from a binary package. The returned metadata
 		dictionary will contain empty strings for any values that
@@ -1445,7 +1449,8 @@ class binarytree:
 		# xpak return key as binary, gpkg return key as str
 		decode_metadata_name = True
 
-		binpkg_format = get_binpkg_format(filename)
+		if not binpkg_format:
+			binpkg_format = get_binpkg_format(filename)
 		if binpkg_format == "xpak":
 			binpkg_metadata = portage.xpak.tbz2(filename).get_data()
 		elif binpkg_format == "gpkg":
