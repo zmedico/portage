@@ -219,9 +219,7 @@ class bindbapi(fakedbapi):
 		if not os.path.exists(binpkg_path):
 			raise KeyError(cpv)
 
-		binpkg_format = cpv._metadata.get('BINPKG_FORMAT', None)
-		if not binpkg_format:
-			binpkg_format = get_binpkg_format(binpkg_path)
+		binpkg_format = cpv.binpkg_format
 		if binpkg_format == "xpak":
 			mytbz2 = portage.xpak.tbz2(binpkg_path)
 			mydata = mytbz2.get_data()
@@ -278,9 +276,7 @@ class bindbapi(fakedbapi):
 			yield add_pkg._db.unpack_metadata(pkg, dest_dir, loop=loop)
 		else:
 			binpkg_file = self.bintree.getname(cpv)
-			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', None)
-			if not binpkg_format:
-				binpkg_format = get_binpkg_format(binpkg_file)
+			binpkg_format = cpv.binpkg_format
 			if binpkg_format == "xpak":
 				yield loop.run_in_executor(ForkExecutor(loop=loop),
 					portage.xpak.tbz2(binpkg_file).unpackinfo, dest_dir)
@@ -312,9 +308,7 @@ class bindbapi(fakedbapi):
 
 		pkg_path = self.bintree.getname(cpv)
 		if pkg_path is not None:
-			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', None)
-			if not binpkg_format:
-				binpkg_format = get_binpkg_format(pkg_path)
+			binpkg_format = cpv.binpkg_format
 			if binpkg_format == 'xpak':
 				extractor = BinpkgExtractorAsync(
 					background=settings.get('PORTAGE_BACKGROUND') == '1',
@@ -558,9 +552,7 @@ class binarytree:
 				continue
 
 			moves += 1
-			binpkg_format = mycpv._metadata["BINPKG_FORMAT"]
-			if not binpkg_format:
-				binpkg_format = get_binpkg_format(binpkg_path)
+			binpkg_format = mycpv.binpkg_format
 			if binpkg_format == "xpak":
 				mytbz2 = portage.xpak.tbz2(binpkg_path)
 				mydata = mytbz2.get_data()
@@ -1548,9 +1540,9 @@ class binarytree:
 		"""
 
 		pkg_path = self.getname(cpv)
-		if hasattr(cpv, "_metadata"):
-			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', "xpak")
-		else:
+		try:
+			binpkg_format = cpv.binpkg_format
+		except AttributeError:
 			raise KeyError("{} metadata not found!".format(cpv))
 
 		d = dict(cpv._metadata.items())
@@ -1772,15 +1764,24 @@ class binarytree:
 					return None
 
 		if filename is None:
-			binpkg_format_fallback = self.settings.get('BINPKG_FORMAT', 'xpak') if allocate_new else None
-			if hasattr(cpv, "_metadata"):
-				binpkg_format = cpv._metadata.get('BINPKG_FORMAT', binpkg_format_fallback)
-			elif allocate_new:
-				binpkg_format = binpkg_format_fallback
-			else:
-				raise InvalidBinaryPackageFormat(binpkg_format)
+			try:
+				binpkg_format = cpv.binpkg_format
+			except AttributeError:
+				# In order to force the caller to clarify its intent, do not
+				# use default BINPKG_FORMAT unless allocate_new is True.
+				# The caller can set cpv.binpkg_format in advance if something
+				# other than the default is desired here.
+				if allocate_new:
+					binpkg_format = self.settings.get('BINPKG_FORMAT', 'xpak')
+				else:
+					binpkg_format = None
 
-			if binpkg_format == "xpak":
+			if not binpkg_format:
+				# Raise an error if the desired binpkg_format is not clear.
+				# The caller should either set allocate_new to True or else
+				# ensure that cpv.binpkg_format is set to a particular format.
+				raise InvalidBinaryPackageFormat(binpkg_format)
+			elif binpkg_format == "xpak":
 				if self._multi_instance:
 					pf = catsplit(cpv)[1]
 					filename = "%s-%s.xpak" % (
@@ -1820,9 +1821,9 @@ class binarytree:
 		return max_build_id
 
 	def _allocate_filename(self, cpv):
-		if hasattr(cpv, "_metadata"):
-			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', "xpak")
-		else:
+		try:
+			binpkg_format = cpv.binpkg_format
+		except AttributeError:
 			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 
 		if binpkg_format == "xpak":
@@ -1844,9 +1845,9 @@ class binarytree:
 		pf = catsplit(cpv)[1]
 		build_id = max_build_id + 1
 
-		if hasattr(cpv, "_metadata"):
-			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', "xpak")
-		else:
+		try:
+			binpkg_format = cpv.binpkg_format
+		except AttributeError:
 			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 
 		if binpkg_format == "xpak":
