@@ -1311,9 +1311,8 @@ class binarytree:
 				noiselevel=-1)
 			return
 
-		binpkg_format = get_binpkg_format(full_path)
-		metadata = self._read_metadata(full_path, s, binpkg_format=binpkg_format)
-		metadata["BINPKG_FORMAT"] = binpkg_format
+		metadata = self._read_metadata(full_path, s)
+		binpkg_format = metadata["BINPKG_FORMAT"]
 
 		invalid_depend = False
 		try:
@@ -1465,6 +1464,9 @@ class binarytree:
 				else:
 					v = _unicode_decode(v)
 					metadata[k] = " ".join(v.split())
+
+		metadata["BINPKG_FORMAT"] = binpkg_format
+
 		return metadata
 
 	def _inject_file(self, pkgindex, cpv, filename):
