@@ -1553,7 +1553,7 @@ class binarytree:
 		if hasattr(cpv, "_metadata"):
 			binpkg_format = cpv._metadata.get('BINPKG_FORMAT', "xpak")
 		else:
-			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+			raise KeyError("{} metadata not found!".format(cpv))
 
 		d = dict(cpv._metadata.items())
 		d.update(perform_multiple_checksums(
