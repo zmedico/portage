@@ -154,9 +154,7 @@ class bindbapi(fakedbapi):
 				st = os.lstat(binpkg_path)
 			except OSError:
 				raise KeyError(mycpv)
-			binpkg_format = mycpv._metadata.get('BINPKG_FORMAT', None)
-			if not binpkg_format:
-				binpkg_format = get_binpkg_format(binpkg_path)
+			binpkg_format = self.cpvdict[instance_key]["BINPKG_FORMAT"]
 			if binpkg_format == "xpak":
 				metadata_bytes = portage.xpak.tbz2(binpkg_path).get_data()
 				decode_metadata_name = False
@@ -485,6 +483,7 @@ class binarytree:
 
 			# Populate the header with appropriate defaults.
 			self._pkgindex_default_header_data = {
+				"BINPKG_FORMAT": self.settings.get("BINPKG_FORMAT", "xpak"),
 				"CHOST"        : self.settings.get("CHOST", ""),
 				"repository"   : "",
 			}
@@ -559,7 +558,7 @@ class binarytree:
 				continue
 
 			moves += 1
-			binpkg_format = mycpv._metadata.get('BINPKG_FORMAT', None)
+			binpkg_format = mycpv._metadata["BINPKG_FORMAT"]
 			if not binpkg_format:
 				binpkg_format = get_binpkg_format(binpkg_path)
 			if binpkg_format == "xpak":
@@ -761,7 +760,6 @@ class binarytree:
 				pkgindex = self._new_pkgindex()
 			metadata = {}
 			basename_index = {}
-			binpkg_format_default = self.settings.get("BINPKG_FORMAT", "xpak")
 			for d in pkgindex.packages:
 				cpv = _pkg_str(d["CPV"], metadata=d,
 					settings=self.settings, db=self.dbapi)
@@ -769,7 +767,7 @@ class binarytree:
 				metadata[_instance_key(cpv)] = d
 				path = d.get("PATH")
 				if not path:
-					binpkg_format = d.get("BINPKG_FORMAT", binpkg_format_default)
+					binpkg_format = d["BINPKG_FORMAT"]
 					if binpkg_format == "xpak":
 						path = cpv + ".tbz2"
 					elif binpkg_format == "gpkg":
