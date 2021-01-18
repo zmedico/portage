@@ -31,13 +31,11 @@ class BinpkgFetcher(CompositeTask):
 		if bintree._remote_has_index:
 			instance_key = bintree.dbapi._instance_key(pkg.cpv)
 			binpkg_path = bintree._remotepkgs[instance_key].get("PATH")
-			binpkg_format = bintree._remotepkgs[instance_key].get(
-				"BINPKG_FORMAT", "xpak")
 			if binpkg_path:
 				self.pkg_path = binpkg_path + ".partial"
 			else:
 				self.pkg_path = pkg.root_config.trees["bintree"].getname(
-					pkg.cpv, binpkg_format=binpkg_format) + ".partial"
+					pkg.cpv, allocate_new=True) + ".partial"
 		else:
 			raise FileNotFound("Binary packages index not found")
 
