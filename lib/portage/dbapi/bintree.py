@@ -66,7 +66,7 @@ class UseCachedCopyOfRemoteIndex(Exception):
 class bindbapi(fakedbapi):
 	_known_keys = frozenset(list(fakedbapi._known_keys) + \
 		["CHOST", "repository", "USE"])
-	_pkg_str_aux_keys = fakedbapi._pkg_str_aux_keys + ("BUILD_ID", "BUILD_TIME", "_mtime_")
+	_pkg_str_aux_keys = fakedbapi._pkg_str_aux_keys + ("BINPKG_FORMAT", "BUILD_ID", "BUILD_TIME", "_mtime_")
 
 	def __init__(self, mybintree=None, **kwargs):
 		# Always enable multi_instance mode for bindbapi indexing. This
@@ -1733,7 +1733,7 @@ class binarytree:
 			return ""
 		return mymatch
 
-	def getname(self, cpv, allocate_new=None, binpkg_format=None):
+	def getname(self, cpv, allocate_new=None):
 		"""Returns a file location for this package.
 		If cpv has both build_time and build_id attributes, then the
 		path to the specific corresponding instance is returned.
@@ -1748,14 +1748,6 @@ class binarytree:
 			cpv.cp
 		except AttributeError:
 			cpv = _pkg_str(cpv)
-
-		if binpkg_format is None:
-			if hasattr(cpv, "_metadata"):
-				binpkg_format = cpv._metadata.get('BINPKG_FORMAT', "xpak")
-				if not binpkg_format:
-					binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
-			else:
-				binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
 
 		filename = None
 		if allocate_new:
@@ -1780,6 +1772,14 @@ class binarytree:
 					return None
 
 		if filename is None:
+			binpkg_format_fallback = self.settings.get('BINPKG_FORMAT', 'xpak') if allocate_new else None
+			if hasattr(cpv, "_metadata"):
+				binpkg_format = cpv._metadata.get('BINPKG_FORMAT', binpkg_format_fallback)
+			elif allocate_new:
+				binpkg_format = binpkg_format_fallback
+			else:
+				raise InvalidBinaryPackageFormat(binpkg_format)
+
 			if binpkg_format == "xpak":
 				if self._multi_instance:
 					pf = catsplit(cpv)[1]
