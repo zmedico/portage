@@ -28,6 +28,7 @@ from portage.util._async.BuildLogger import BuildLogger
 from portage.util.futures import asyncio
 from portage.util.futures.executor.fork import ForkExecutor
 from portage.exception import InvalidBinaryPackageFormat
+from portage.const import SUPPORTED_GENTOO_BINPKG_FORMATS
 
 try:
 	from portage.xml.metadata import MetaDataXML
@@ -137,7 +138,7 @@ class EbuildPhase(CompositeTask):
 
 		if self.phase == 'package':
 			if 'PORTAGE_BINPKG_TMPFILE' not in self.settings:
-				binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+				binpkg_format = self.settings.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0])
 				if binpkg_format == "xpak":
 					self.settings['BINPKG_FORMAT'] = "xpak"
 					self.settings['PORTAGE_BINPKG_TMPFILE'] = \

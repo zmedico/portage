@@ -50,7 +50,8 @@ portage.proxy.lazyimport.lazyimport(globals(),
 )
 
 from portage.const import CACHE_PATH, CONFIG_MEMORY_FILE, \
-	MERGING_IDENTIFIER, PORTAGE_PACKAGE_ATOM, PRIVATE_PATH, VDB_PATH
+	MERGING_IDENTIFIER, PORTAGE_PACKAGE_ATOM, PRIVATE_PATH, VDB_PATH, \
+	SUPPORTED_GENTOO_BINPKG_FORMATS
 from portage.dbapi import dbapi
 from portage.exception import CommandNotFound, \
 	InvalidData, InvalidLocation, InvalidPackageName, \
@@ -1006,7 +1007,7 @@ class vardbapi(dbapi):
 				'y' if include_unmodified_config else 'n'))
 		opts, args = parser.parse_known_args(opts_list)
 
-		binpkg_format = settings.get("BINPKG_FORMAT", "xpak")
+		binpkg_format = settings.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0])
 		if binpkg_format == "xpak":
 			tar_cmd = ('tar', '-x', '--xattrs', '--xattrs-include=*', '-C', dest_dir)
 			pr, pw = os.pipe()
@@ -1994,7 +1995,7 @@ class dblink:
 		contents = self.getcontents()
 		excluded_config_files = []
 		protect = None
-		binpkg_format = settings.get("BINPKG_FORMAT", "xpak")
+		binpkg_format = settings.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0])
 
 		if not include_config:
 			confprot = ConfigProtect(settings['EROOT'],
