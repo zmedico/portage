@@ -252,7 +252,7 @@ class bindbapi(fakedbapi):
 				% binpkg_path)
 
 		# inject will clear stale caches via cpv_inject.
-		self.bintree.inject(cpv, filename=binpkg_path)
+		self.bintree.inject(cpv)
 
 
 	@coroutine
