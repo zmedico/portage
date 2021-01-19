@@ -304,7 +304,7 @@ call_has_and_best_version() {
 			port=binhost_server.server_port,
 			path=binhost_remote_path)
 
-		binpkg_format = settings.get("BINPKG_FORMAT", "xpak")
+		binpkg_format = settings.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0])
 		self.assertIn(binpkg_format, ("xpak", "gpkg"))
 		if binpkg_format == "xpak":
 			foo_filename = "foo-0.tbz2"

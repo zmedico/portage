@@ -115,7 +115,7 @@ class _BinpkgFetcherProcess(SpawnProcess):
 		if bintree._remote_has_index:
 			remote_metadata = bintree._remotepkgs[
 				bintree.dbapi._instance_key(pkg.cpv)]
-			binpkg_format = remote_metadata.get("BINPKG_FORMAT", "xpak")
+			binpkg_format = remote_metadata.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0])
 			if binpkg_format not in SUPPORTED_GENTOO_BINPKG_FORMATS:
 				raise InvalidBinaryPackageFormat(binpkg_format)
 			rel_uri = remote_metadata.get("PATH")

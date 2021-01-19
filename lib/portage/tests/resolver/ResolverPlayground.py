@@ -9,7 +9,9 @@ import portage
 from itertools import permutations
 from portage import os
 from portage import shutil
-from portage.const import (GLOBAL_CONFIG_PATH, USER_CONFIG_PATH)
+from portage.const import (GLOBAL_CONFIG_PATH, USER_CONFIG_PATH,
+	SUPPORTED_GENTOO_BINPKG_FORMATS,
+)
 from portage.process import find_binary
 from portage.dep import Atom, _repo_separator
 from portage.package.ebuild.config import config
@@ -271,7 +273,7 @@ class ResolverPlayground:
 		# a dict.
 		items = getattr(binpkgs, 'items', None)
 		items = items() if items is not None else binpkgs
-		binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+		binpkg_format = self.settings.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0])
 		if binpkg_format == "gpkg":
 			if self.gpg is None:
 				self.gpg = GPG(self.settings)

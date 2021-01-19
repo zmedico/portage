@@ -48,7 +48,8 @@ from portage import bsd_chflags, \
 	unmerge, _encodings, _os_merge, \
 	_shell_quote, _unicode_decode, _unicode_encode
 from portage.const import EBUILD_SH_ENV_FILE, EBUILD_SH_ENV_DIR, \
-	EBUILD_SH_BINARY, INVALID_ENV_FILE, MISC_SH_BINARY, PORTAGE_PYM_PACKAGES
+	EBUILD_SH_BINARY, INVALID_ENV_FILE, MISC_SH_BINARY, PORTAGE_PYM_PACKAGES, \
+	SUPPORTED_GENTOO_BINPKG_FORMATS
 from portage.data import portage_gid, portage_uid, secpass, \
 	uid, userpriv_groups
 from portage.dbapi.porttree import _parse_uri_map
@@ -532,7 +533,7 @@ def doebuild_environment(myebuild, mydo, myroot=None, settings=None,
 				mysettings["KV"] = ""
 			mysettings.backup_changes("KV")
 
-		binpkg_format = mysettings.get("BINPKG_FORMAT", "xpak")
+		binpkg_format = mysettings.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0])
 		if binpkg_format not in portage.const.SUPPORTED_GENTOO_BINPKG_FORMATS:
 			writemsg("!!! BINPKG_FORMAT contains invalid or "
 				"unsupported format: %s" % binpkg_fotmat,

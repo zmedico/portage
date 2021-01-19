@@ -25,7 +25,9 @@ portage.proxy.lazyimport.lazyimport(globals(),
 from portage.binrepo.config import BinRepoConfigLoader
 from portage.cache.mappings import slot_dict_class
 from portage.const import (BINREPOS_CONF_FILE, CACHE_PATH,
-	SUPPORTED_XPAK_EXTENSIONS, SUPPORTED_GPKG_EXTENSIONS)
+	SUPPORTED_XPAK_EXTENSIONS, SUPPORTED_GPKG_EXTENSIONS,
+	SUPPORTED_GENTOO_BINPKG_FORMATS,
+)
 from portage.dbapi.virtual import fakedbapi
 from portage.dep import Atom, use_reduce, paren_enclose
 from portage.exception import AlarmSignal, InvalidPackageName, \
@@ -477,7 +479,7 @@ class binarytree:
 
 			# Populate the header with appropriate defaults.
 			self._pkgindex_default_header_data = {
-				"BINPKG_FORMAT": self.settings.get("BINPKG_FORMAT", "xpak"),
+				"BINPKG_FORMAT": self.settings.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0]),
 				"CHOST"        : self.settings.get("CHOST", ""),
 				"repository"   : "",
 			}
@@ -1311,9 +1313,8 @@ class binarytree:
 				noiselevel=-1)
 			return
 
-		binpkg_format = get_binpkg_format(full_path)
-		metadata = self._read_metadata(full_path, s, binpkg_format=binpkg_format)
-		metadata["BINPKG_FORMAT"] = binpkg_format
+		metadata = self._read_metadata(full_path, s)
+		binpkg_format = metadata["BINPKG_FORMAT"]
 
 		invalid_depend = False
 		try:
@@ -1465,6 +1466,9 @@ class binarytree:
 				else:
 					v = _unicode_decode(v)
 					metadata[k] = " ".join(v.split())
+
+		metadata["BINPKG_FORMAT"] = binpkg_format
+
 		return metadata
 
 	def _inject_file(self, pkgindex, cpv, filename):
@@ -1772,7 +1776,7 @@ class binarytree:
 				# The caller can set cpv.binpkg_format in advance if something
 				# other than the default is desired here.
 				if allocate_new:
-					binpkg_format = self.settings.get('BINPKG_FORMAT', 'xpak')
+					binpkg_format = self.settings.get('BINPKG_FORMAT', SUPPORTED_GENTOO_BINPKG_FORMATS[0])
 				else:
 					binpkg_format = None
 
@@ -1824,7 +1828,7 @@ class binarytree:
 		try:
 			binpkg_format = cpv.binpkg_format
 		except AttributeError:
-			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+			binpkg_format = self.settings.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0])
 
 		if binpkg_format == "xpak":
 			return os.path.join(self.pkgdir, cpv + ".tbz2")
@@ -1848,7 +1852,7 @@ class binarytree:
 		try:
 			binpkg_format = cpv.binpkg_format
 		except AttributeError:
-			binpkg_format = self.settings.get("BINPKG_FORMAT", "xpak")
+			binpkg_format = self.settings.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0])
 
 		if binpkg_format == "xpak":
 			filename_format = "%s-%s.xpak"

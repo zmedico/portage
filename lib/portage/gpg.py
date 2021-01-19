@@ -7,6 +7,7 @@ import threading
 import time
 
 from portage import os
+from portage.const import SUPPORTED_GENTOO_BINPKG_FORMATS
 from portage.exception import GPGException
 from portage.output import colorize
 from portage.util import shlex_split, varexpand, writemsg, writemsg_stdout
@@ -34,7 +35,7 @@ class GPG:
 		If gpg-keepalive is set, start keepalive thread.
 		"""
 		if (self.GPG_unlock_command
-			and (self.settings.get("BINPKG_FORMAT", "xpak") == "gpkg")):
+			and (self.settings.get("BINPKG_FORMAT", SUPPORTED_GENTOO_BINPKG_FORMATS[0]) == "gpkg")):
 			try:
 				os.environ["GPG_TTY"] = os.ttyname(sys.stdout.fileno())
 			except OSError as e:
