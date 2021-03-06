@@ -92,6 +92,22 @@ def _get_lock_fn():
         _lock_fn = fcntl.lockf
         return _lock_fn
 
+    if _test_lock_fn(
+        lambda path, fd, flags: fcntl.flock(fd, flags)
+        and functools.partial(unlockfile, (path, fd, False, fcntl.flock))
+    ):
+        _lock_fn = fcntl.flock
+        return _lock_fn
+
+    if not _test_lock_fn(
+        lambda path, fd, flags: hardlink_lockfile(
+            path, flags=(os.O_NONBLOCK if flags & fcntl.LOCK_NB else 0)
+        )
+        and functools.partial(unlockfile, (path, HARDLINK_FD, False, None))
+    ):
+        # TODO: Add fallback to handle missing hardlink permission for android (bug 774384)
+        pass
+
     # Fall back to fcntl.flock.
     _lock_fn = fcntl.flock
     return _lock_fn
