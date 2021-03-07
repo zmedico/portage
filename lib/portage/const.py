@@ -234,6 +234,8 @@ if "PORTAGE_OVERRIDE_EPREFIX" in os.environ:
 		if EPREFIX == os.sep:
 			EPREFIX = ""
 
+VDB_CONTENTS_EXPLICIT_EPREFIX = True
+
 VCS_DIRS = ("CVS", "RCS", "SCCS", ".bzr", ".git", ".hg", ".svn")
 
 # List of known live eclasses. Keep it in sync with cnf/sets/portage.conf

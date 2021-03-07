@@ -49,7 +49,8 @@ portage.proxy.lazyimport.lazyimport(globals(),
 )
 
 from portage.const import CACHE_PATH, CONFIG_MEMORY_FILE, \
-	MERGING_IDENTIFIER, PORTAGE_PACKAGE_ATOM, PRIVATE_PATH, VDB_PATH
+	MERGING_IDENTIFIER, PORTAGE_PACKAGE_ATOM, PRIVATE_PATH, \
+	VDB_CONTENTS_EXPLICIT_EPREFIX, VDB_PATH
 from portage.dbapi import dbapi
 from portage.exception import CommandNotFound, \
 	InvalidData, InvalidLocation, InvalidPackageName, \
@@ -1883,8 +1884,11 @@ class dblink:
 		# The old symlink format may exist on systems that have packages
 		# which were installed many years ago (see bug #351814).
 		oldsym_index = contents_re.groupindex['oldsym']
-		# CONTENTS files already contain EPREFIX
-		myroot = self.settings['ROOT']
+		if VDB_CONTENTS_EXPLICIT_EPREFIX:
+			# CONTENTS files already contain EPREFIX
+			myroot = self.settings['ROOT']
+		else:
+			myroot = self.settings['EROOT']
 		if myroot == os.path.sep:
 			myroot = None
 		# used to generate parent dir entries
@@ -5301,7 +5305,8 @@ class dblink:
 	def _format_contents_line(
 		self, node_type, abs_path, md5_digest=None, symlink_target=None, mtime_ns=None
 	):
-		fields = [node_type, abs_path]
+		path = abs_path if VDB_CONTENTS_EXPLICIT_EPREFIX else abs_path[len(self.settings['EPREFIX']):]
+		fields = [node_type, path]
 		if md5_digest is not None:
 			fields.append(md5_digest)
 		elif symlink_target is not None:

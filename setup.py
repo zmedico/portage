@@ -519,6 +519,13 @@ class x_install_lib(install_lib):
 							'os.path.realpath(os.path.join(__file__, "../.."))',
 						),
 					),
+					(
+						r"^(VDB_CONTENTS_EXPLICIT_EPREFIX\s*=\s*)(.*)",
+						lambda m: "{}{}".format(
+							m.group(1),
+							'False',
+						),
+					),
 				),
 			)
 		else:
