@@ -129,7 +129,9 @@ install_qa_check() {
 			# Allow inheriting eclasses.
 			# XXX: we want this only in repository-wide checks.
 			_IN_INSTALL_QA_CHECK=1
+			echo $(date) begin "${d}/${f}"
 			source "${d}/${f}" || eerror "Post-install QA check ${f} failed to run"
+			echo $(date) end "${d}/${f}"
 		)
 	done < <(printf "%s\0" "${qa_checks[@]}" | LC_ALL=C sort -u -z)
 
