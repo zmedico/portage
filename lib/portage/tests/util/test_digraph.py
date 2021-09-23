@@ -1,6 +1,9 @@
 # Copyright 2010-2012 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
+from _emerge.DepPriority import DepPriority
+from _emerge.DepPriorityNormalRange import DepPriorityNormalRange
+from _emerge.DepPrioritySatisfiedRange import DepPrioritySatisfiedRange
 from portage.tests import TestCase
 from portage.util.digraph import digraph
 
@@ -262,3 +265,32 @@ class DigraphTest(TestCase):
         self.assertEqual(g.root_nodes(), ["B"])
         self.assertEqual(g.root_nodes(ignore_priority=always_false), ["B"])
         self.assertEqual(g.root_nodes(ignore_priority=always_true), ["A", "B"])
+
+    def testDigraphEdgePriority(self):
+        g = digraph()
+        buildtime = DepPriority(buildtime=True)
+        runtime = DepPriority(runtime=True)
+        runtime_post = DepPriority(runtime_post=True)
+        optional = DepPriority(optional=True)
+
+        g.add("A", "B", priority=optional)
+        g.add("A", "B", priority=runtime_post)
+        g.add("A", "B", priority=buildtime)
+
+        g.add("B", "A", priority=runtime)
+        g.add("B", "A", priority=runtime_post)
+        g.add("B", "A", priority=optional)
+
+        expected_priorities = [
+            (optional, runtime_post, runtime),
+            (optional, runtime_post, buildtime),
+        ]
+
+        for priority_range in (DepPriorityNormalRange, DepPrioritySatisfiedRange):
+
+            edges = g._sort_edges(priority_range.sort_key)
+
+            for i, edge in enumerate(edges):
+                priorities = g._get_priorities(edge)
+                self.assertEqual(priorities, expected_priorities[i])
+            self.assertEqual(edges, [("A", "B"), ("B", "A")])

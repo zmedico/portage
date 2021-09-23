@@ -5,6 +5,7 @@ __all__ = ["digraph"]
 
 import bisect
 from collections import deque
+import functools
 
 from portage.util import writemsg
 
@@ -111,6 +112,34 @@ class digraph:
                 del self.nodes[child][1][node]
             del self.nodes[node]
         self.order = order
+
+    def _get_priorities(self, edge):
+        """
+        Return priorities of edge.
+
+        @param edge: (parent, child)
+        @type edge: tuple
+        @rtype: list
+        @return: list of DepPriority
+        """
+        parent, child = edge
+        return tuple(self.nodes[parent][0][child])
+
+    def _sort_priorities(self, priority_key):
+        for node, node_info in self.nodes.items():
+            for child, priorities in node_info[0].items():
+                priorities.sort(key=priority_key)
+
+    def _sort_edges(self, priority_key):
+        edges = list(self._iter_edges())
+        self._sort_priorities(priority_key)
+        edges.sort(key=functools.partial(_edge_key, self, priority_key))
+        return edges
+
+    def _iter_edges(self):
+        for parent in self.order:
+            for child in self.child_nodes(parent):
+                yield (parent, child)
 
     def has_edge(self, child, parent):
         """
@@ -378,3 +407,58 @@ class digraph:
     __contains__ = contains
     empty = is_empty
     copy = clone
+
+
+class _edge_key:
+    def __init__(self, graph, priority_key, edge):
+        self._graph = graph
+        self._priority_key = priority_key
+        self._edge = edge
+
+    def __lt__(self, other):
+        parent, child = self._edge
+        other_parent, other_child = other._edge
+
+        return self._priority_key(
+            self._graph.nodes[parent][0][child][-1]
+        ) < self._priority_key(self._graph.nodes[other_parent][0][other_child][-1])
+
+    def __le__(self, other):
+        parent, child = self._edge
+        other_parent, other_child = other._edge
+
+        return self._priority_key(
+            self._graph.nodes[parent][0][child][-1]
+        ) <= self._priority_key(self._graph.nodes[other_parent][0][other_child][-1])
+
+    def __gt__(self, other):
+        parent, child = self._edge
+        other_parent, other_child = other._edge
+
+        return self._priority_key(
+            self._graph.nodes[parent][0][child][-1]
+        ) > self._priority_key(self._graph.nodes[other_parent][0][other_child][-1])
+
+    def __ge__(self, other):
+        parent, child = self._edge
+        other_parent, other_child = other._edge
+
+        return self._priority_key(
+            self._graph.nodes[parent][0][child][-1]
+        ) >= self._priority_key(self._graph.nodes[other_parent][0][other_child][-1])
+
+    def __eq__(self, other):
+        parent, child = self._edge
+        other_parent, other_child = other._edge
+
+        return self._priority_key(
+            self._graph.nodes[parent][0][child][-1]
+        ) == self._priority_key(self._graph.nodes[other_parent][0][other_child][-1])
+
+    def __ne__(self, other):
+        parent, child = self._edge
+        other_parent, other_child = other._edge
+
+        return self._priority_key(
+            self._graph.nodes[parent][0][child][-1]
+        ) != self._priority_key(self._graph.nodes[other_parent][0][other_child][-1])

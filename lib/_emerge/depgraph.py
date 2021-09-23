@@ -9318,8 +9318,19 @@ class depgraph:
                 def find_smallest_cycle(mergeable_nodes, local_priority_range):
                     if prefer_asap and asap_nodes:
                         nodes = asap_nodes
+                        # Sort nodes for deterministic results.
+                        nodes = sorted(nodes)
                     else:
                         nodes = mergeable_nodes
+                        # Order nodes by increasing edge priority.
+                        edges = mygraph._sort_edges(priority_range.sort_key)
+                        nodes_set = set(nodes)
+                        nodes = []
+                        for edge in edges:
+                            for node in edge:
+                                if node in nodes_set:
+                                    nodes.append(node)
+                                    nodes_set.remove(node)
                     # When gathering the nodes belonging to a runtime cycle,
                     # we want to minimize the number of nodes gathered, since
                     # this tends to produce a more optimal merge order.
@@ -9333,8 +9344,6 @@ class depgraph:
                     smallest_cycle = None
                     ignore_priority = None
 
-                    # Sort nodes for deterministic results.
-                    nodes = sorted(nodes)
                     for priority in (
                         local_priority_range.ignore_priority[i]
                         for i in range(
@@ -9353,6 +9362,9 @@ class depgraph:
                                 node,
                                 smallest_cycle=smallest_cycle,
                             ):
+                                #if len(selected_nodes) < 2:
+                                    # Cycles must contain at least 2 nodes.
+                                #    continue
                                 if smallest_cycle is None or len(selected_nodes) < len(
                                     smallest_cycle
                                 ):
