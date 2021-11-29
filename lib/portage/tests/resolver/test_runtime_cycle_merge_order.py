@@ -64,10 +64,11 @@ class RuntimeCycleMergeOrderTestCase(TestCase):
             ),
         )
 
-        playground = ResolverPlayground(ebuilds=ebuilds)
+        playground = ResolverPlayground(ebuilds=ebuilds, debug=True)
         try:
             for test_case in test_cases:
                 playground.run_TestCase(test_case)
                 self.assertEqual(test_case.test_success, True, test_case.fail_msg)
         finally:
+            playground.debug = False
             playground.cleanup()

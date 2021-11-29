@@ -1,4 +1,4 @@
-# Copyright 2011-2020 Gentoo Authors
+# Copyright 2011-2021 Gentoo Authors
 # Distributed under the terms of the GNU General Public License v2
 
 from portage.tests import TestCase
@@ -699,23 +699,24 @@ class MergeOrderTestCase(TestCase):
                     "!app-misc/installed-blocker-a",
                     "app-misc/circ-direct-a-1",
                     "app-misc/circ-direct-b-1",
+                    "app-misc/circ-satisfied-a-1",
+                    "app-misc/circ-satisfied-b-1",
+                    "app-misc/circ-satisfied-c-1",
                     "x11-base/xorg-server-1.14.1",
                     "media-libs/mesa-9.1.3",
                     "app-misc/circ-buildtime-a-1",
                     "app-misc/circ-buildtime-b-1",
                     "app-misc/circ-buildtime-c-1",
                     "app-misc/some-app-c-1",
-                    "app-misc/circ-satisfied-a-1",
-                    "app-misc/circ-satisfied-b-1",
-                    "app-misc/circ-satisfied-c-1",
                 ],
             ),
         )
 
-        playground = ResolverPlayground(ebuilds=ebuilds, installed=installed)
+        playground = ResolverPlayground(ebuilds=ebuilds, installed=installed, debug=True)
         try:
             for test_case in test_cases:
                 playground.run_TestCase(test_case)
                 self.assertEqual(test_case.test_success, True, test_case.fail_msg)
         finally:
+            playground.debug = False
             playground.cleanup()

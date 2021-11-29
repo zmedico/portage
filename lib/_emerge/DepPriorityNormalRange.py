@@ -1,7 +1,11 @@
-# Copyright 1999-2011 Gentoo Foundation
+# Copyright 1999-2021 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
-from _emerge.DepPriority import DepPriority
+from _emerge.DepPriority import (
+    DepPriority,
+    DepPriorityIndex,
+    index_priority,
+)
 
 
 class DepPriorityNormalRange:
@@ -20,6 +24,10 @@ class DepPriorityNormalRange:
     MEDIUM_POST = 2
     SOFT = 1
     NONE = 0
+
+    @classmethod
+    def sort_key(cls, priority):
+        return index_priority(priority, cls.ignore_priority)
 
     @classmethod
     def _ignore_optional(cls, priority):

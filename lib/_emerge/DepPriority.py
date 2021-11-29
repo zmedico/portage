@@ -55,3 +55,38 @@ class DepPriority(AbstractDepPriority):
         if self.runtime_post:
             return "runtime_post"
         return "soft"
+
+
+class DepPriorityIndex:
+    def __init__(self, index):
+        self._index = index
+
+    def __lt__(self, other):
+        return self._index < other._index
+
+    def __le__(self, other):
+        return self._index <= other._index
+
+    def __gt__(self, other):
+        return self._index > other._index
+
+    def __ge__(self, other):
+        return self._index >= other._index
+
+    def __eq__(self, other):
+        return self._index == other._index
+
+    def __ne__(self, other):
+        return self._index != other._index
+
+
+def index_priority(priority, priority_range):
+    """
+    Return a DepPriorityIndex instance for comparison of the given
+    priority to other priorities within the given priority range.
+    """
+    for i, ignore_priority in reversed(list(enumerate(priority_range))):
+        if ignore_priority is None:
+            return DepPriorityIndex(i)
+        elif not ignore_priority(priority):
+            return DepPriorityIndex(i)
