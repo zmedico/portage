@@ -9151,7 +9151,9 @@ class depgraph:
 
                 asap_nodes.extend(libc_pkgs)
 
-        def gather_deps(ignore_priority, mergeable_nodes, selected_nodes, node):
+        def gather_deps(
+            ignore_priority, mergeable_nodes, selected_nodes, node, smallest_cycle=None
+        ):
             """
             Recursively gather a group of nodes that RDEPEND on
             eachother. This ensures that they are merged as a group
@@ -9172,9 +9174,17 @@ class depgraph:
                 # (these occur when new portage blocks an older package version).
                 return False
             selected_nodes.add(node)
+            if smallest_cycle is not None and len(selected_nodes) >= len(
+                smallest_cycle
+            ):
+                return False
             for child in mygraph.child_nodes(node, ignore_priority=ignore_priority):
                 if not gather_deps(
-                    ignore_priority, mergeable_nodes, selected_nodes, child
+                    ignore_priority,
+                    mergeable_nodes,
+                    selected_nodes,
+                    child,
+                    smallest_cycle=smallest_cycle,
                 ):
                     return False
             return True
@@ -9337,7 +9347,11 @@ class depgraph:
                                 continue
                             selected_nodes = set()
                             if gather_deps(
-                                priority, mergeable_nodes, selected_nodes, node
+                                priority,
+                                mergeable_nodes,
+                                selected_nodes,
+                                node,
+                                smallest_cycle=smallest_cycle,
                             ):
                                 if smallest_cycle is None or len(selected_nodes) < len(
                                     smallest_cycle
