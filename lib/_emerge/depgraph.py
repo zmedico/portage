@@ -65,6 +65,7 @@ from portage.util._async.TaskScheduler import TaskScheduler
 from portage.versions import _pkg_str, catpkgsplit
 from portage.binpkg import get_binpkg_format
 
+import _emerge.actions
 from _emerge.AtomArg import AtomArg
 from _emerge.Blocker import Blocker
 from _emerge.BlockerCache import BlockerCache
@@ -165,7 +166,9 @@ class _frozen_depgraph_config:
         # no soname data. Therefore, only enable soname dependency
         # resolution if --usepkgonly is enabled, or for removal actions.
         self.soname_deps_enabled = (
-            "--usepkgonly" in myopts or "remove" in params
+            "--usepkgonly" in myopts
+            or "remove" in params
+            or "model_broken_deps" in params
         ) and params.get("ignore_soname_deps") != "y"
         dynamic_deps = "dynamic_deps" in params
         ignore_built_slot_operator_deps = (
@@ -9079,6 +9082,19 @@ class depgraph:
             self._dynamic_config.digraph.debug_print()
             writemsg("\n", noiselevel=-1)
 
+        # TODO: Eliminate need for "remove" in params, since
+        # self._frozen_config is shared.
+        installed_state = _emerge.actions._calc_depclean(
+            self._frozen_config.roots[self._frozen_config.target_root].settings,
+            self._frozen_config._trees_orig,
+            None,
+            self._frozen_config.myopts,
+            "dep_check",
+            InternalPackageSet(allow_wildcard=True),
+            None,
+            frozen_config=self._frozen_config,
+        ).depgraph
+
         scheduler_graph = self._dynamic_config.digraph.copy()
 
         if "--nodeps" in self._frozen_config.myopts:
@@ -9892,16 +9908,30 @@ class depgraph:
                 # and uninstallation tasks.
                 solved_blockers = set()
                 uninst_task = None
+                vardb = self._frozen_config.trees[node.root]["vartree"].dbapi
+                inst_pkg = vardb.match_pkgs(node.slot_atom)
+                if inst_pkg:
+                    inst_pkg = inst_pkg[0]
                 if isinstance(node, Package) and "uninstall" == node.operation:
                     have_uninstall_task = True
                     uninst_task = node
+                    parents = installed_state._dynamic_config.digraph.parent_nodes(
+                        inst_pkg
+                    )
+                    installed_state._remove_pkg(inst_pkg, remove_orphans=False)
+                    # TODO: Refresh unsatisfied dependencies of parents
                 else:
-                    vardb = self._frozen_config.trees[node.root]["vartree"].dbapi
-                    inst_pkg = vardb.match_pkgs(node.slot_atom)
                     if inst_pkg:
+                        parents = installed_state._dynamic_config.digraph.parent_nodes(
+                            inst_pkg
+                        )
+                        installed_state._remove_pkg(inst_pkg, remove_orphans=False)
+                        # TODO: Refresh unsatisfied dependencies of parents
+                        # TODO: Add replacement package to installed_state
+                        # (needs to be converted from "ebuild" or "binary" to "installed" type).
+
                         # The package will be replaced by this one, so remove
                         # the corresponding Uninstall task if necessary.
-                        inst_pkg = inst_pkg[0]
                         uninst_task = Package(
                             built=inst_pkg.built,
                             cpv=inst_pkg.cpv,

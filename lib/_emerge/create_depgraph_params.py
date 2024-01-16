@@ -41,7 +41,8 @@ def create_depgraph_params(myopts, myaction):
     # changed_deps_report: report installed packages with outdated deps
     # changed_slot: rebuild installed packages with outdated SLOT metadata
     # binpkg_changed_deps: reject binary packages with outdated deps
-    myparams = {"recurse": True}
+    # model_broken_deps: model broken dependencies during merge order calculations
+    myparams = {"model_broken_deps": True, "recurse": True}
 
     binpkg_respect_use = myopts.get("--binpkg-respect-use")
     if binpkg_respect_use is not None:

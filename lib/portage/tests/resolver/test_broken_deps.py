@@ -29,12 +29,19 @@ class BrokenDepsTestCase(TestCase):
             },
             "dev-qt/qtxmlpatterns-5.15.11": {
                 "EAPI": "8",
+                "SLOT": "5",
                 "DEPEND": "=dev-qt/qtcore-5.15.11*",
                 "RDEPEND": "=dev-qt/qtcore-5.15.11*",
+            },
+            "kde-frameworks/syntax-highlighting-5.114.0": {
+                "EAPI": "8",
+                "DEPEND": ">=dev-qt/qtxmlpatterns-5.15.9:5",
+                "RDEPEND": ">=dev-qt/qtxmlpatterns-5.15.9:5",
             },
             "kde-frameworks/syntax-highlighting-5.113.0": {
                 "EAPI": "8",
                 "DEPEND": ">=dev-qt/qtxmlpatterns-5.15.9:5",
+                "RDEPEND": ">=dev-qt/qtxmlpatterns-5.15.9:5",
             },
         }
         installed = {
@@ -43,12 +50,14 @@ class BrokenDepsTestCase(TestCase):
             },
             "dev-qt/qtxmlpatterns-5.15.11": {
                 "EAPI": "8",
+                "SLOT": "5",
                 "DEPEND": "=dev-qt/qtcore-5.15.11*",
                 "RDEPEND": "=dev-qt/qtcore-5.15.11*",
             },
             "kde-frameworks/syntax-highlighting-5.113.0": {
                 "EAPI": "8",
                 "DEPEND": ">=dev-qt/qtxmlpatterns-5.15.9:5",
+                "RDEPEND": ">=dev-qt/qtxmlpatterns-5.15.9:5",
             },
         }
 
@@ -63,14 +72,24 @@ class BrokenDepsTestCase(TestCase):
                     "dev-qt/qtxmlpatterns-5.15.11": {"=dev-qt/qtcore-5.15.11*"}
                 },
             ),
+            ResolverPlaygroundTestCase(
+                ["@world"],
+                options={"--deep": True, "--update": True},
+                success=True,
+                mergelist=[
+                    "dev-qt/qtcore-5.15.11-r1",
+                    "kde-frameworks/syntax-highlighting-5.114.0",
+                ],
+            ),
         )
 
         playground = ResolverPlayground(
-            ebuilds=ebuilds, installed=installed, world=world
+            ebuilds=ebuilds, installed=installed, world=world, debug=True
         )
         try:
             for test_case in test_cases:
                 playground.run_TestCase(test_case)
                 self.assertEqual(test_case.test_success, True, test_case.fail_msg)
         finally:
+            playground.debug = False
             playground.cleanup()
