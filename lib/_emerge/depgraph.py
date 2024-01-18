@@ -5321,8 +5321,12 @@ class depgraph:
 
                         if pkg:
                             atom = Atom(atom.replace(atom.cp, pkg.cp))
+                            arg.atom = dep.atom = atom
+                            arg.pset.replace([atom])
+                            self._set_args([arg])
 
-                            if not self._add_pkg(pkg, dep):
+                            # goto _select_package below
+                            if False and not self._add_pkg(pkg, dep):
                                 writemsg(
                                     f"\n\n!!! Problem resolving dependencies for {arg.arg=}, {arg.atom=}\n",
                                     noiselevel=-1,

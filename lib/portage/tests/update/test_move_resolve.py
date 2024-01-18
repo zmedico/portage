@@ -140,4 +140,5 @@ class MoveResolveTestCase(TestCase):
                             test_case.test_success, True, test_case.fail_msg
                         )
                 finally:
+                    playground.debug = False
                     playground.cleanup()
