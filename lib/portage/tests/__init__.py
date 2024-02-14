@@ -3,7 +3,6 @@
 # Distributed under the terms of the GNU General Public License v2
 
 import argparse
-import multiprocessing
 import sys
 import time
 import unittest
@@ -12,7 +11,7 @@ from pathlib import Path
 from unittest.runner import TextTestResult as _TextTestResult
 
 import portage
-from portage import os
+from portage import multiprocessing, os
 from portage.util import no_color
 from portage import _encodings
 from portage import _unicode_decode
@@ -81,13 +80,7 @@ class TestCase(unittest.TestCase):
         self.sbindir = cnf_sbindir
 
     def setUp(self):
-        """
-        Setup multiprocessing start method if needed. It needs to be
-        done relatively late in order to work with the pytest-xdist
-        plugin due to execnet usage.
-        """
-        if os.environ.get("PORTAGE_MULTIPROCESSING_START_METHOD") == "spawn":
-            multiprocessing.set_start_method("spawn", force=True)
+        pass
 
     def assertRaisesMsg(self, msg, excClass, callableObj, *args, **kwargs):
         """Fail unless an exception of class excClass is thrown
