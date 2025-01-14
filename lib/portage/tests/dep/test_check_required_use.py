@@ -1,8 +1,10 @@
 # Copyright 2010-2018 Gentoo Foundation
 # Distributed under the terms of the GNU General Public License v2
 
+import portage
 from portage.tests import TestCase
 from portage.dep import check_required_use
+from portage.dep.required_use.validate_ast import validate_ast_passthrough
 from portage.exception import InvalidDependString
 
 
@@ -109,8 +111,16 @@ class TestCheckRequiredUse(TestCase):
         test_cases_xfail_eapi = (("?? ( a b )", [], ["a", "b"], "4"),)
 
         for required_use, use, iuse, expected in test_cases:
+            node = check_required_use(required_use, use, iuse.__contains__)
+            try:
+                list(validate_ast_passthrough(node.ast))
+            except portage.exception.PortageException as e:
+                if "group in || operator forbidden" not in str(
+                    e
+                ) and "group in ^^ operator forbidden" not in str(e):
+                    raise
             self.assertEqual(
-                bool(check_required_use(required_use, use, iuse.__contains__)),
+                bool(node),
                 expected,
                 required_use + ", USE = " + " ".join(use),
             )

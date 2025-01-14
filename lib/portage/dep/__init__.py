@@ -39,6 +39,7 @@ import portage
 portage.proxy.lazyimport.lazyimport(
     globals(),
     "portage.util:cmp_sort_key,writemsg",
+    "portage.dep.required_use:parser@_required_use_ast",
 )
 
 from portage import _encodings, _unicode_decode, _unicode_encode
@@ -2825,11 +2826,17 @@ def get_required_use_flags(required_use, eapi=None):
 
 
 class _RequiredUseLeaf:
-    __slots__ = ("_satisfied", "_token")
+    __slots__ = ("enabled", "name", "_satisfied", "_token")
 
     def __init__(self, token, satisfied):
         self._token = token
         self._satisfied = satisfied
+        if token[:1] == "!":
+            self.name = token[1:]
+            self.enabled = False
+        else:
+            self.name = token
+            self.enabled = True
 
     def tounicode(self):
         return self._token
@@ -2846,6 +2853,32 @@ class _RequiredUseBranch:
 
     def __bool__(self):
         return self._satisfied
+
+    @staticmethod
+    def _convert_ast(node):
+        for node in node._children:
+            if isinstance(node, _RequiredUseLeaf):
+                yield _required_use_ast.Flag(node.name, node.enabled)
+            else:
+                k = node._operator or "&&"
+                ast_cls = _required_use_ast.ast_cls(k)
+                if ast_cls is None:
+                    # strip ?
+                    assert k[-1:] == "?"
+                    k = k[:-1]
+                    if k[:1] == "!":
+                        kf = _required_use_ast.Flag(k[1:], False)
+                    else:
+                        kf = _required_use_ast.Flag(k)
+                    yield _required_use_ast.Implication(
+                        [kf], list(_RequiredUseBranch._convert_ast(node))
+                    )
+                else:
+                    yield ast_cls(list(_RequiredUseBranch._convert_ast(node)))
+
+    @property
+    def ast(self):
+        return self._convert_ast(self)
 
     def tounicode(self):
         include_parens = self._parent is not None

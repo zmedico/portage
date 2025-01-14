@@ -53,6 +53,7 @@ class Package(Task):
         "_provided_cps",
         "_raw_metadata",
         "_provides",
+        "_required_use",
         "_requires",
         "_use",
         "_validated_atoms",
@@ -634,6 +635,7 @@ class Package(Task):
             self._force = frozensets.setdefault(s, s)
             s = pkgsettings.usemask
             self._mask = frozensets.setdefault(s, s)
+            self._pkg._required_use = pkgsettings.required_use
 
         @property
         def expand(self):
@@ -676,12 +678,19 @@ class Package(Task):
             self._init_use()
         return self._use
 
+    @property
+    def required_use(self):
+        if self._use is None:
+            self._init_use()
+        return self._required_use
+
     def _get_pkgsettings(self):
         pkgsettings = self.root_config.trees["porttree"].dbapi.doebuild_settings
         pkgsettings.setcpv(self)
         return pkgsettings
 
     def _init_use(self):
+        self._required_use = None
         if self.built:
             # Use IUSE to validate USE settings for built packages,
             # in case the package manager that built this package
@@ -694,6 +703,11 @@ class Package(Task):
             enabled_flags = [x for x in use_str.split() if is_valid_flag(x)]
             use_str = " ".join(enabled_flags)
             self._use = self._use_class(self, enabled_flags)
+            # There's no point in checking REQUIRED_USE
+            # for built packages.
+            self._required_use = check_required_use(
+                "", self.use.enabled, lambda k: True
+            )
         else:
             try:
                 use_str = _PackageMetadataWrapperBase.__getitem__(self._metadata, "USE")
@@ -709,9 +723,19 @@ class Package(Task):
             # calculations that were done.
             if calculated_use:
                 self._use._init_force_mask()
-
+            else:
+                # Assume that REQUIRED_USE is satisfied.
+                self._required_use = check_required_use(
+                    "", self.use.enabled, lambda k: True
+                )
         _PackageMetadataWrapperBase.__setitem__(self._metadata, "USE", use_str)
-
+        if self._required_use is None:
+            # USE was passed in via the with_use method,
+            # and REQUIRED_USE will be satisfied unless
+            # solving failed for some reason.
+            self._required_use = check_required_use(
+                self.metadata.get("REQUIRED_USE", ""), self.use.enabled, lambda k: True
+            )
         return use_str
 
     class _iuse:

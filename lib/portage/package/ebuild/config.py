@@ -48,6 +48,7 @@ from portage.const import (
 from portage.dbapi import dbapi
 from portage.dep import (
     Atom,
+    check_required_use,
     isvalidatom,
     match_from_list,
     use_reduce,
@@ -339,6 +340,7 @@ class config:
             self.usemask = clone.usemask
             self.useforce = clone.useforce
             self.puse = clone.puse
+            self.required_use = clone.required_use
             self.user_profile_dir = clone.user_profile_dir
             self.local_config = clone.local_config
             self.make_defaults_use = clone.make_defaults_use
@@ -865,6 +867,7 @@ class config:
             # Initialize all USE related variables we track ourselves.
             self.usemask = self._use_manager.getUseMask()
             self.useforce = self._use_manager.getUseForce()
+            self.required_use = None
             self.configdict["conf"]["USE"] = (
                 self._use_manager.extract_global_USE_changes(
                     self.configdict["conf"].get("USE", "")
@@ -1675,6 +1678,7 @@ class config:
             self.configdict["defaults"]["USE"] = " ".join(self.make_defaults_use)
             self.usemask = self._use_manager.getUseMask()
             self.useforce = self._use_manager.getUseForce()
+            self.required_use = None
         self.regenerate()
 
     class _lazy_vars:
@@ -1858,6 +1862,7 @@ class config:
         pkg_configdict = self.configdict["pkg"]
         previous_iuse = pkg_configdict.get("IUSE")
         previous_iuse_effective = pkg_configdict.get("IUSE_EFFECTIVE")
+        previous_required_use = pkg_configdict.get("REQUIRED_USE")
         previous_features = pkg_configdict.get("FEATURES")
         previous_penv = self._penv
 
@@ -1978,6 +1983,10 @@ class config:
         usemask = self._use_manager.getUseMask(cpv_slot)
         if usemask != self.usemask:
             self.usemask = usemask
+            has_changed = True
+
+        required_use = pkg_configdict.get("REQUIRED_USE")
+        if required_use != previous_required_use:
             has_changed = True
 
         oldpuse = self.puse
@@ -2272,9 +2281,9 @@ class config:
         # attribute since we still want to be able to see global USE
         # settings for things like emerge --info.
 
-        self.configdict["env"]["PORTAGE_USE"] = " ".join(
-            sorted(x for x in use if x[-2:] != "_*")
-        )
+        use = frozenset(x for x in use if x[-2:] != "_*")
+        self.configdict["env"]["PORTAGE_USE"] = " ".join(sorted(use))
+        self.required_use = check_required_use(required_use or "", use, lambda k: True)
 
         # Clear the eapi cache here rather than in the constructor, since
         # setcpv triggers lazy instantiation of things like _use_manager.
