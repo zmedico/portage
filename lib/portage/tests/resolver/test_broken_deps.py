@@ -24,11 +24,13 @@ class BrokenDepsTestCase(TestCase):
             },
             "dev-qt/qtxmlpatterns-5.15.12": {
                 "EAPI": "8",
+                "SLOT": "5",
                 "DEPEND": "=dev-qt/qtcore-5.15.12*",
                 "RDEPEND": "=dev-qt/qtcore-5.15.12*",
             },
             "dev-qt/qtxmlpatterns-5.15.11": {
                 "EAPI": "8",
+                "SLOT": "5",
                 "DEPEND": "=dev-qt/qtcore-5.15.11*",
                 "RDEPEND": "=dev-qt/qtcore-5.15.11*",
             },
@@ -43,6 +45,7 @@ class BrokenDepsTestCase(TestCase):
             },
             "dev-qt/qtxmlpatterns-5.15.11": {
                 "EAPI": "8",
+                "SLOT": "5",
                 "DEPEND": "=dev-qt/qtcore-5.15.11*",
                 "RDEPEND": "=dev-qt/qtcore-5.15.11*",
             },
@@ -63,14 +66,27 @@ class BrokenDepsTestCase(TestCase):
                     "dev-qt/qtxmlpatterns-5.15.11": {"=dev-qt/qtcore-5.15.11*"}
                 },
             ),
+            ResolverPlaygroundTestCase(
+                ["@world"],
+                success=True,
+                options={
+                    "--update": True,
+                    "--deep": True,
+                    "--with-bdeps": "y",
+                },
+                mergelist=[
+                    "dev-qt/qtxmlpatterns-5.15.12",
+                ],
+            ),
         )
 
         playground = ResolverPlayground(
-            ebuilds=ebuilds, installed=installed, world=world
+            ebuilds=ebuilds, installed=installed, world=world, debug=True
         )
         try:
             for test_case in test_cases:
                 playground.run_TestCase(test_case)
                 self.assertEqual(test_case.test_success, True, test_case.fail_msg)
         finally:
+            playground.debug = False
             playground.cleanup()
