@@ -71,6 +71,7 @@ from _emerge.BlockerCache import BlockerCache
 from _emerge.BlockerDepPriority import BlockerDepPriority
 from .chk_updated_cfg_files import chk_updated_cfg_files
 from _emerge.countdown import countdown
+from _emerge.create_depgraph_params import create_depgraph_params
 from _emerge.create_world_atom import create_world_atom
 from _emerge.Dependency import Dependency
 from _emerge.DependencyArg import DependencyArg
@@ -9197,6 +9198,40 @@ class depgraph:
             writemsg("\ndigraph:\n\n", noiselevel=-1)
             self._dynamic_config.digraph.debug_print()
             writemsg("\n", noiselevel=-1)
+
+        dep_check_params = create_depgraph_params(self._frozen_config.myopts, "remove")
+
+        dep_check_frozen_config = _frozen_depgraph_config(
+            self._frozen_config.settings,
+            self._frozen_config._trees_orig,
+            self._frozen_config.myopts,
+            dep_check_params,
+            self._frozen_config.spinner,
+        )
+        dep_check_frozen_config._pkg_cache = self._frozen_config._pkg_cache
+
+        from _emerge.actions import _calc_depclean
+
+        dep_check_result = _calc_depclean(
+            self._frozen_config.settings,
+            self._frozen_config._trees_orig,
+            None,
+            dep_check_frozen_config.myopts,
+            "dep_check",
+            InternalPackageSet(initial_atoms=None, allow_wildcard=True),
+            None,
+            frozen_config=dep_check_frozen_config,
+        )
+
+        assert dep_check_result.returncode == 0
+        # dep_check_result.depgraph._dynamic_config._initially_unsatisfied_deps
+        # (Pdb) p dep_check_result.depgraph._frozen_config.trees["/tmp/tmp2c9p61hj/"]["vartree"].dbapi
+        # <_emerge.PackageVirtualDbapi.PackageVirtualDbapi object at 0x4cc86994890>
+        # (Pdb) p self._frozen_config.trees["/tmp/tmp2c9p61hj/"]["vartree"].dbapi
+        # <_emerge.PackageVirtualDbapi.PackageVirtualDbapi object at 0x4cc86991410>
+        # TODO: Adjust DepPriority satisfied attribute to account for broken runtime
+        # dependencies. A broken runtime dependency should taint the parent package
+        # and its anscestors recursively.
 
         scheduler_graph = self._dynamic_config.digraph.copy()
 
