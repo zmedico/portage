@@ -6,6 +6,57 @@ Release notes take the form of the following optional categories:
 * Bug fixes
 * Cleanups
 
+portage-3.0.78 (UNRELEASED)
+--------------
+
+Breaking changes:
+
+* cnf: enable verify-signature by default in binrepos.conf (bug #945384,
+  bug #969086)
+
+  PGP signature verification is now enabled by default for all binary
+  repositories.
+
+  Signature verification is not supported for the old 'xpak' binary format
+  (i.e. it requires the new 'gpkg' format).
+
+  The new default can be overridden in /etc/portage/binrepos.conf with either:
+  ```
+  [DEFAULT]
+  verify-signature = false
+  ```
+  or
+  ```
+  [reponame]
+  verify-signature = false
+  ```
+
+  To set up signing for binpkgs, a signing keyring must reside (by default)
+  at /root/.gnupg and a verification keyring must reside (by default)
+  at /etc/portage/gnupg.
+
+Features:
+
+* Read binrepos.conf from /usr/share/portage/config as well.
+
+* bintree: Run trust helper when any binrepos.conf configuration has
+  verify-signature enabled (bug #969187)
+
+* Scheduler: No background mode if there is just one merge job (bug #339579)
+
+* emerge: Warn on installed packages in @world without ebuilds available
+  (bug #911180).
+
+Bug fixes:
+
+* man: portage(5): Document that binrepos.conf location must be unique.
+
+* bintree: Improve error message for per-binhost Packages fetch failure.
+
+* phase-helpers.sh: Fix unpack vs. empty suffixes (bug #969217).
+
+* estrip: Silence noise from objcopy when no build ID section exists (bug #968220).
+
 portage-3.0.77 (2026-01-23)
 --------------
 
