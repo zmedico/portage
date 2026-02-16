@@ -311,20 +311,15 @@ class SyncRepos:
         if "--quiet" in self.emerge_config.opts:
             return msgs
 
+        porttree = self.emerge_config.target_config.trees["porttree"]
+        vartree = self.emerge_config.target_config.trees["vartree"]
+
         for early_name, early_pkg in early_update_packages.items():
-            best_pv = self.emerge_config.target_config.trees["porttree"].dbapi.xmatch(
-                "bestmatch-visible", early_pkg
-            )
-            installed_pv = portage.best(
-                self.emerge_config.target_config.trees["vartree"].dbapi.match(early_pkg)
-            )
+            best_pv = porttree.dbapi.xmatch("bestmatch-visible", early_pkg)
+            installed_pv = portage.best(vartree.dbapi.match(early_pkg))
 
             try:
-                old_use = (
-                    self.emerge_config.target_config.trees["vartree"]
-                    .dbapi.aux_get(installed_pv, ["USE"])[0]
-                    .split()
-                )
+                old_use = vartree.dbapi.aux_get(installed_pv, ["USE"])[0].split()
             except KeyError:
                 old_use = ()
 
@@ -335,7 +330,7 @@ class SyncRepos:
             # Since changes to PYTHON_TARGETS cause complications, this message
             # is suppressed if the new version has different PYTHON_TARGETS enabled
             # than previous version.
-            portdb = self.emerge_config.target_config.trees["porttree"].dbapi
+            portdb = porttree.dbapi
             portdb.doebuild_settings.setcpv(best_pv, mydb=portdb)
             usemask = portdb.doebuild_settings.usemask
             useforce = portdb.doebuild_settings.useforce
