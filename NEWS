@@ -54,6 +54,10 @@ Features:
   Portage will notify the user if a named package has an update available,
   like it does for itself, after a sync.
 
+* binrepos.conf: Implement openpgp-key-package (bug #968578).
+
+  Behaves the same way as the aforementioned repos.conf option.
+
 * cnf: repos.conf: Set sync-openpgp-key-package for ::gentoo.
 
 Bug fixes:
