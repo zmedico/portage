@@ -30,10 +30,12 @@ Breaking changes:
   [reponame]
   verify-signature = false
   ```
+  or with FEATURES="binpkg-ignore-signature" in /etc/portage/make.conf.
 
   To set up signing for binpkgs, a signing keyring must reside (by default)
   at /root/.gnupg and a verification keyring must reside (by default)
-  at /etc/portage/gnupg.
+  at /etc/portage/gnupg. The verification keyring must mark the signing
+  key as trusted. Signing is toggled by FEATURES="binpkg-signing".
 
 Features:
 
