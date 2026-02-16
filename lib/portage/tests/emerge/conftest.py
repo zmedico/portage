@@ -800,6 +800,9 @@ def _generate_all_baseline_commands(playground, binhost):
     with open(binrepos_conf_file, "w") as f:
         f.write("[test-binhost]\n")
         f.write(f"sync-uri = {binhost_uri}\n")
+        if binpkg_format == "xpak":
+            f.write("verify-signature = false\n")
+
     fetchcommand = shlex.split(settings["FETCHCOMMAND"])
     fetch_bin = portage.process.find_binary(fetchcommand[0])
 
@@ -842,6 +845,8 @@ def _generate_all_baseline_commands(playground, binhost):
             with open(binrepos_conf_file, "w") as f:
                 f.write("[test-binhost]\n")
                 f.write(f"sync-uri = file://{binhost_dir}\n")
+                if binpkg_format == "xpak":
+                    f.write("verify-signature = false\n")
 
         getbinpkgonly_file_uri = Emerge(
             "-fe",
