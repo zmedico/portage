@@ -286,73 +286,84 @@ class SyncRepos:
                 self._reload_config()
 
     def _check_updates(self):
-        from _emerge.chk_updated_cfg_files import chk_updated_cfg_files
+        """
+        After syncing, notify the user if any important packages
+        have updates available that should be installed first before
+        anything else.
 
-        best_portage_pv = self.emerge_config.target_config.trees["porttree"].dbapi.xmatch(
-            "bestmatch-visible", portage.const.PORTAGE_PACKAGE_ATOM
-        )
-        installed_portage_pv = portage.best(
-            self.emerge_config.target_config.trees["vartree"].dbapi.match(
-                portage.const.PORTAGE_PACKAGE_ATOM
-            )
-        )
-        try:
-            old_use = (
-                self.emerge_config.target_config.trees["vartree"]
-                .dbapi.aux_get(installed_portage_pv, ["USE"])[0]
-                .split()
-            )
-        except KeyError:
-            old_use = ()
+        Portage always includes itself in this list to check.
+        """
+        from _emerge.chk_updated_cfg_files import chk_updated_cfg_files
 
         chk_updated_cfg_files(
             self.emerge_config.target_config.root,
             self.emerge_config.target_config.settings.get("CONFIG_PROTECT", "").split(),
         )
 
+        early_update_packages = {
+            "Portage": portage.const.PORTAGE_PACKAGE_ATOM,
+        }
         msgs = []
-        if (
-            not (best_portage_pv and installed_portage_pv)
-            or best_portage_pv == installed_portage_pv
-            or "--quiet" in self.emerge_config.opts
-        ):
+
+        if "--quiet" in self.emerge_config.opts:
             return msgs
 
-        # Suggest to update to the latest available version of portage.
-        # Since changes to PYTHON_TARGETS cause complications, this message
-        # is suppressed if the new version has different PYTHON_TARGETS enabled
-        # than previous version.
-        portdb = self.emerge_config.target_config.trees["porttree"].dbapi
-        portdb.doebuild_settings.setcpv(best_portage_pv, mydb=portdb)
-        usemask = portdb.doebuild_settings.usemask
-        useforce = portdb.doebuild_settings.useforce
-        new_use = (
-            frozenset(portdb.doebuild_settings["PORTAGE_USE"].split()) | useforce
-        ) - usemask
-        new_python_targets = frozenset(
-            x for x in new_use if x.startswith("python_targets_")
-        )
-        old_python_targets = frozenset(
-            x for x in old_use if x.startswith("python_targets_")
-        )
+        for early_name, early_pkg in early_update_packages.items():
+            best_pv = self.emerge_config.target_config.trees["porttree"].dbapi.xmatch(
+                "bestmatch-visible", early_pkg
+            )
+            installed_pv = portage.best(
+                self.emerge_config.target_config.trees["vartree"].dbapi.match(early_pkg)
+            )
 
-        if new_python_targets == old_python_targets:
-            msgs.append("")
-            msgs.append(
-                warn(" * ")
-                + bold("An update to portage is available.")
-                + " It is _highly_ recommended"
+            try:
+                old_use = (
+                    self.emerge_config.target_config.trees["vartree"]
+                    .dbapi.aux_get(installed_pv, ["USE"])[0]
+                    .split()
+                )
+            except KeyError:
+                old_use = ()
+
+            if not (best_pv and installed_pv) or best_pv == installed_pv:
+                continue
+
+            # Suggest to update to the latest available version of portage.
+            # Since changes to PYTHON_TARGETS cause complications, this message
+            # is suppressed if the new version has different PYTHON_TARGETS enabled
+            # than previous version.
+            portdb = self.emerge_config.target_config.trees["porttree"].dbapi
+            portdb.doebuild_settings.setcpv(best_pv, mydb=portdb)
+            usemask = portdb.doebuild_settings.usemask
+            useforce = portdb.doebuild_settings.useforce
+            new_use = (
+                frozenset(portdb.doebuild_settings["PORTAGE_USE"].split()) | useforce
+            ) - usemask
+            new_python_targets = frozenset(
+                x for x in new_use if x.startswith("python_targets_")
             )
-            msgs.append(
-                warn(" * ")
-                + "that you update portage now, before any other packages are updated."
+            old_python_targets = frozenset(
+                x for x in old_use if x.startswith("python_targets_")
             )
-            msgs.append("")
-            msgs.append(
-                warn(" * ")
-                + "To update portage, run 'emerge --oneshot sys-apps/portage' now."
-            )
-            msgs.append("")
+
+            if new_python_targets == old_python_targets:
+                msgs.append("")
+                msgs.append(
+                    warn(" * ")
+                    + bold(f"An update to {early_name} is available.")
+                    + " It is _highly_ recommended"
+                )
+                msgs.append(
+                    warn(" * ")
+                    + f"that you update {early_name} now, before any other packages are updated."
+                )
+                msgs.append("")
+                msgs.append(
+                    warn(" * ")
+                    + f"To update {early_name}, run 'emerge --oneshot {early_pkg}' now."
+                )
+                msgs.append("")
+
         return msgs
 
     def _reload_config(self):
