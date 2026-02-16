@@ -145,6 +145,7 @@ class RepoConfig:
         "sync_depth",
         "sync_hooks_only_on_change",
         "sync_openpgp_keyserver",
+        "sync_openpgp_key_package",
         "sync_openpgp_key_path",
         "sync_openpgp_key_refresh",
         "sync_openpgp_key_refresh_retry_count",
@@ -269,6 +270,7 @@ class RepoConfig:
             repo_opts.get("sync-openpgp-keyserver", "").strip().lower() or None
         )
 
+        self.sync_openpgp_key_package = repo_opts.get("sync-openpgp-key-package", None)
         self.sync_openpgp_key_path = repo_opts.get("sync-openpgp-key-path", None)
 
         sync_openpgp_key_refresh = repo_opts.get(
@@ -755,6 +757,7 @@ class RepoConfigLoader:
                             "sync_depth",
                             "sync_hooks_only_on_change",
                             "sync_openpgp_keyserver",
+                            "sync_openpgp_key_package",
                             "sync_openpgp_key_path",
                             "sync_openpgp_key_refresh",
                             "sync_openpgp_key_refresh_retry_count",
@@ -1316,6 +1319,7 @@ class RepoConfigLoader:
             "priority",
             "sync_depth",
             "sync_openpgp_keyserver",
+            "sync_openpgp_key_package",
             "sync_openpgp_key_path",
             "sync_openpgp_key_refresh_retry_count",
             "sync_openpgp_key_refresh_retry_delay_exp_base",

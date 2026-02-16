@@ -1224,6 +1224,11 @@ Extra options to give to rsync on repository synchronization. It takes
 precedence over a declaration in [DEFAULT] section, that takes
 precedence over PORTAGE_RSYNC_EXTRA_OPTS.
 .TP
+.B sync\-openpgp\-key\-package
+Package name providing the keyring referenced in sync\-openpgp\-key\-path.
+If set, Portage will notify the user when an update is available for
+this package immediately after syncing.
+.TP
 .B sync\-openpgp\-key\-path
 Path to the OpenPGP key(ring) used to verify received repository. Used
 only for protocols supporting cryptographic verification, provided

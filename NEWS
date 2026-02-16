@@ -49,6 +49,11 @@ Features:
 * emerge: Warn on installed packages in @world without ebuilds available
   (bug #911180).
 
+* repos.conf: Implement sync-openpgp-key-package (bug #968578).
+
+  Portage will notify the user if a named package has an update available,
+  like it does for itself, after a sync.
+
 Bug fixes:
 
 * man: portage(5): Document that binrepos.conf location must be unique.

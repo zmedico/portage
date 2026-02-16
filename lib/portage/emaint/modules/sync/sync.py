@@ -303,13 +303,23 @@ class SyncRepos:
             self.emerge_config.target_config.settings.get("CONFIG_PROTECT", "").split(),
         )
 
+        msgs = []
+        if "--quiet" in self.emerge_config.opts:
+            return msgs
+
         early_update_packages = {
             "Portage": portage.const.PORTAGE_PACKAGE_ATOM,
         }
-        msgs = []
 
-        if "--quiet" in self.emerge_config.opts:
-            return msgs
+        repos = self.emerge_config.target_config.settings.repositories
+        for repo in repos:
+            try:
+                key_package = repo.sync_openpgp_key_package
+                if not key_package:
+                    continue
+                early_update_packages[f"OpenPGP keys ({repo.name})"] = key_package
+            except AttributeError:
+                continue
 
         porttree = self.emerge_config.target_config.trees["porttree"]
         vartree = self.emerge_config.target_config.trees["vartree"]
