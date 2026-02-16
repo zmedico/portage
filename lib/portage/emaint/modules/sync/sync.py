@@ -288,10 +288,10 @@ class SyncRepos:
     def _check_updates(self):
         from _emerge.chk_updated_cfg_files import chk_updated_cfg_files
 
-        mybestpv = self.emerge_config.target_config.trees["porttree"].dbapi.xmatch(
+        best_portage_pv = self.emerge_config.target_config.trees["porttree"].dbapi.xmatch(
             "bestmatch-visible", portage.const.PORTAGE_PACKAGE_ATOM
         )
-        mypvs = portage.best(
+        installed_portage_pv = portage.best(
             self.emerge_config.target_config.trees["vartree"].dbapi.match(
                 portage.const.PORTAGE_PACKAGE_ATOM
             )
@@ -299,7 +299,7 @@ class SyncRepos:
         try:
             old_use = (
                 self.emerge_config.target_config.trees["vartree"]
-                .dbapi.aux_get(mypvs, ["USE"])[0]
+                .dbapi.aux_get(installed_portage_pv, ["USE"])[0]
                 .split()
             )
         except KeyError:
@@ -312,8 +312,8 @@ class SyncRepos:
 
         msgs = []
         if (
-            not (mybestpv and mypvs)
-            or mybestpv == mypvs
+            not (best_portage_pv and installed_portage_pv)
+            or best_portage_pv == installed_portage_pv
             or "--quiet" in self.emerge_config.opts
         ):
             return msgs
@@ -323,7 +323,7 @@ class SyncRepos:
         # is suppressed if the new version has different PYTHON_TARGETS enabled
         # than previous version.
         portdb = self.emerge_config.target_config.trees["porttree"].dbapi
-        portdb.doebuild_settings.setcpv(mybestpv, mydb=portdb)
+        portdb.doebuild_settings.setcpv(best_portage_pv, mydb=portdb)
         usemask = portdb.doebuild_settings.usemask
         useforce = portdb.doebuild_settings.useforce
         new_use = (
