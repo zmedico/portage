@@ -267,19 +267,22 @@ class SyncRepos:
 
     def _do_pkg_moves(self):
         configs = [self.emerge_config.target_config]
-        if (
-            self.emerge_config.target_config.root
-            != self.emerge_config.running_config.root
-        ):
-            configs.append(self.emerge_config.running_config)
+        target_config = self.emerge_config.target_config
+        running_config = self.emerge_config.running_config
+        package_moves = self.emerge_config.opts.get("--package-moves") != "n"
+        quiet = "--quiet" in self.emerge_config.opts
+        if not package_moves:
+            return
+
+        if target_config.root != running_config.root:
+            configs.append(running_config)
+
         for root_config in configs:
-            if self.emerge_config.opts.get(
-                "--package-moves"
-            ) != "n" and _global_updates(
+            if _global_updates(
                 root_config.root,
                 self.emerge_config.trees,
                 root_config.mtimedb["updates"],
-                quiet=("--quiet" in self.emerge_config.opts),
+                quiet=quiet,
             ):
                 root_config.mtimedb.commit()
                 # Reload the whole config.
