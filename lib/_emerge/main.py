@@ -128,6 +128,14 @@ def insert_optional_args(args):
         "n",
     )
 
+    class valid_integers_or_y_or_n:
+        def __contains__(self, s):
+            if s in valid_integers:
+                return True
+            return s in y_or_n
+
+    valid_integers_or_y_or_n = valid_integers_or_y_or_n()
+
     new_args = []
 
     default_arg_opts = {
@@ -155,7 +163,7 @@ def insert_optional_args(args):
         "--getbinpkg": y_or_n,
         "--getbinpkgonly": y_or_n,
         "--ignore-world": y_or_n,
-        "--jobs": valid_integers,
+        "--jobs": valid_integers_or_y_or_n,
         "--jobs-tmpdir-require-free-gb": valid_integers,
         "--keep-going": y_or_n,
         "--load-average": valid_floats,
@@ -1005,17 +1013,18 @@ def parse_opts(tmpcmdline, silent=False):
 
     if myoptions.jobs is not None:
         jobs = None
-        if myoptions.jobs == "True":
+        if myoptions.jobs in ("True", "y"):
             jobs = True
+        elif myoptions.jobs == "n":
+            jobs = None
         else:
             try:
                 jobs = int(myoptions.jobs)
             except ValueError:
-                jobs = None
+                if not silent:
+                    parser.error(f"Invalid --jobs parameter: '{myoptions.jobs}'\n")
 
-        if jobs is None and not silent:
-            parser.error(f"Invalid --jobs parameter: '{myoptions.jobs}'\n")
-        elif jobs == 0:
+        if jobs == 0:
             from portage.util.cpuinfo import get_cpu_count
 
             jobs = get_cpu_count()
