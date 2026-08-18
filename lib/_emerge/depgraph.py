@@ -690,6 +690,9 @@ class _dynamic_depgraph_config:
         # Packages that --depclean cannot remove because they are kept
         # alive by a dependency cycle, mapped to the cycle members.
         self._depclean_cycle_suggestions = {}
+        # Packages that are merged before one of their runtime
+        # dependencies, in order to break a cycle.
+        self._ignored_runtime_deps = {}
         # Transient cycle-breaking builds, mapped to the package that
         # they are built ahead of.
         self._cycle_break_pkgs = {}
@@ -9753,6 +9756,10 @@ class depgraph:
             frontier = _SerializeFrontier(mygraph)
             mygraph.frontier = frontier
 
+        # Whether the merge order ever had to break a cycle, which is the
+        # only way a runtime dependency can end up being ignored.
+        broke_cycle = False
+
         while mygraph:
             selected_nodes = None
             ignore_priority = None
@@ -9951,6 +9958,7 @@ class depgraph:
                         continue
                 else:
                     cycle_digraph = mygraph.induced_subgraph(selected_nodes)
+                    broke_cycle = True
 
                     leaves = cycle_digraph.leaf_nodes()
                     if leaves:
@@ -10458,6 +10466,11 @@ class depgraph:
             if isinstance(node, Blocker):
                 node.satisfied = True
 
+        if broke_cycle:
+            self._dynamic_config._ignored_runtime_deps = (
+                self._find_ignored_runtime_deps(retlist)
+            )
+
         retlist.extend(unsolvable_blockers)
         retlist = tuple(retlist)
 
@@ -10638,6 +10651,68 @@ class depgraph:
                 if atom.match(child):
                     return True
         return False
+
+    def _show_ignored_runtime_deps(self):
+        """
+        Warn about packages that are merged before their runtime
+        dependencies, since they do not work until the rest of the cycle
+        has been merged (bug 647824).
+        """
+        ignored = self._dynamic_config._ignored_runtime_deps
+        if not ignored or "--quiet" in self._frozen_config.myopts:
+            return
+
+        writemsg(
+            "\n!!! The following packages will be merged before their runtime\n"
+            "!!! dependencies, in order to break a circular dependency. They\n"
+            "!!! do not work until the packages listed below them are merged:\n",
+            noiselevel=-1,
+        )
+        for pkg in sorted(ignored, key=lambda x: x.cpv):
+            writemsg(f"  {pkg.cpv}\n", noiselevel=-1)
+            for child in sorted(ignored[pkg], key=lambda x: x.cpv):
+                writemsg(f"    requires {child.cpv}\n", noiselevel=-1)
+
+        if not self._cycle_break_enabled():
+            writemsg(
+                "!!! Try "
+                + colorize("bold", "--cycle-break=y")
+                + " to build one of these packages twice instead.\n",
+                noiselevel=-1,
+            )
+
+    def _find_ignored_runtime_deps(self, retlist):
+        """
+        Return the packages that are merged before a runtime dependency
+        of theirs, which happens when a cycle can only be broken by
+        ignoring a runtime dependency. Such a package is temporarily
+        broken on the installed system (bug 647824).
+        """
+        positions = {node: index for index, node in enumerate(retlist)}
+
+        graph = self._dynamic_config.digraph
+        ignored = {}
+        for index, node in enumerate(retlist):
+            if not isinstance(node, Package) or node.operation != "merge":
+                continue
+            if node not in graph:
+                continue
+            for child in graph.child_nodes(node):
+                if not isinstance(child, Package):
+                    continue
+                if child.installed or child.operation != "merge":
+                    continue
+                priorities = graph.nodes[node][0][child]
+                if not any(
+                    priority.runtime and not priority.satisfied
+                    for priority in priorities
+                ):
+                    continue
+                child_index = positions.get(child)
+                if child_index is None or child_index > index:
+                    ignored.setdefault(node, set()).add(child)
+
+        return ignored
 
     def _cycle_break_enabled(self):
         return self._frozen_config.myopts.get("--cycle-break") == "y"
@@ -11651,6 +11726,8 @@ class depgraph:
             self._show_abi_rebuild_info()
 
         self._show_ignored_binaries()
+
+        self._show_ignored_runtime_deps()
 
         self._changed_deps_report()
 
