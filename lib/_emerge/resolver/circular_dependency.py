@@ -35,7 +35,8 @@ class circular_dependency_handler:
         self.search_truncated = set()
         # Solutions, keyed by the package whose USE flags have to
         # change. Unlike self.solutions, this identifies the package
-        # that the change applies to.
+        # that the change applies to, which is what the resolver needs
+        # in order to apply a solution automatically.
         self.parent_solutions = {}
 
         if "--debug" in depgraph._frozen_config.myopts:

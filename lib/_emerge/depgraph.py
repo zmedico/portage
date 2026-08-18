@@ -10252,8 +10252,6 @@ class depgraph:
                     continue
 
             if not selected_nodes:
-                self._dynamic_config._circular_deps_for_display = mygraph
-
                 unsolved_cycle = False
                 if self._dynamic_config._allow_backtracking:
                     backtrack_infos = self._dynamic_config._backtrack_infos
@@ -10278,8 +10276,19 @@ class depgraph:
                             )
 
                 if unsolved_cycle or not self._dynamic_config._allow_backtracking:
-                    self._dynamic_config._skip_restart = True
+                    # Adjusting || preferences did not help, so try to
+                    # break the cycle with a USE change as a last resort.
+                    if self._dynamic_config._allow_backtracking and (
+                        self._solve_cycle_with_use_changes(
+                            circular_dependency_handler(self, mygraph)
+                        )
+                    ):
+                        self._dynamic_config._need_restart = True
+                    else:
+                        self._dynamic_config._circular_deps_for_display = mygraph
+                        self._dynamic_config._skip_restart = True
                 else:
+                    self._dynamic_config._circular_deps_for_display = mygraph
                     self._dynamic_config._need_restart = True
 
                 raise self._unknown_internal_error()
@@ -10412,6 +10421,74 @@ class depgraph:
             raise self._unknown_internal_error()
 
         return retlist, scheduler_graph
+
+    def _solve_cycle_with_use_changes(self, handler):
+        """
+        Try to break a cycle by changing USE flags that the user has not
+        requested, using the same mechanism as autounmask. The change is
+        presented to the user like any other autounmask change, and the
+        resolver restarts with the new configuration (bug 175808).
+
+        @return: True if a USE change was applied
+        """
+        if not self._dynamic_config._autounmask:
+            return False
+        if self._frozen_config.myopts.get("--autounmask-use") == "n":
+            return False
+
+        candidates = []
+        for pkg, solutions in handler.parent_solutions.items():
+            user_flags = self._user_requested_use_flags(pkg)
+            for solution in solutions:
+                if any(flag in user_flags for flag, state in solution):
+                    # The user asked for this flag, so report the cycle
+                    # instead of silently overriding the request.
+                    continue
+                # Prefer the smallest solution, then the one that
+                # disables the fewest flags, and finally sort by name so
+                # that the result does not depend on set iteration order.
+                candidates.append(
+                    (
+                        (
+                            len(solution),
+                            sum(1 for flag, state in solution if state),
+                            tuple(sorted(solution)),
+                            pkg.cpv,
+                        ),
+                        pkg,
+                        solution,
+                    )
+                )
+        candidates.sort(key=lambda x: x[0])
+
+        for _key, pkg, solution in candidates:
+            target_use = dict(solution)
+            old_use = self._pkg_use_enabled(pkg)
+            new_use = self._pkg_use_enabled(pkg, target_use)
+            if new_use == old_use:
+                # Either the change was rejected, for example because it
+                # violates REQUIRED_USE or use.mask, or it has already
+                # been applied by an earlier pass, in which case trying
+                # it again would loop.
+                continue
+
+            return True
+
+        return False
+
+    def _user_requested_use_flags(self, pkg):
+        """
+        Return the USE flags that the user has explicitly set for pkg,
+        via make.conf or package.use.
+        """
+        pkgsettings = self._frozen_config.pkgsettings[pkg.root]
+        flags = set()
+        for flag in pkgsettings._use_manager.getPUSE(pkg.cpv).split():
+            flags.add(flag.lstrip("-"))
+        for key in ("conf", "env", "features"):
+            for flag in pkgsettings.configdict.get(key, {}).get("USE", "").split():
+                flags.add(flag.lstrip("-"))
+        return flags
 
     def _show_circular_deps(self, mygraph):
         self._dynamic_config._circular_dependency_handler = circular_dependency_handler(
