@@ -220,6 +220,15 @@ class Backtracker:
                     para.circular_dependency.setdefault(pkg, set()).update(
                         circular_children
                     )
+            elif change == "circular_pkg_mask":
+                # Unlike the other mask reasons, the value is the set of
+                # packages that pkg is in a cycle with, rather than a set
+                # of parent atoms. depgraph._show_missed_update_circular_dep()
+                # is the only consumer.
+                for pkg, cycle_members in data.items():
+                    para.runtime_pkg_mask.setdefault(pkg, {})[
+                        "circular dependency"
+                    ] = cycle_members
             elif change == "needed_unstable_keywords":
                 para.needed_unstable_keywords.update(data)
             elif change == "needed_p_mask_changes":

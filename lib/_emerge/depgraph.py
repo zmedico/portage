@@ -1583,6 +1583,7 @@ class depgraph:
         ):
             missed_update_types.pop("slot conflict", None)
             missed_update_types.pop("missing dependency", None)
+            missed_update_types.pop("circular dependency", None)
 
         self._show_missed_update_slot_conflicts(
             missed_update_types.get("slot conflict")
@@ -1591,6 +1592,42 @@ class depgraph:
         self._show_missed_update_unsatisfied_dep(
             missed_update_types.get("missing dependency")
         )
+
+        self._show_missed_update_circular_dep(
+            missed_update_types.get("circular dependency")
+        )
+
+    def _show_missed_update_circular_dep(self, missed_updates):
+        """
+        Report the packages that have been masked during backtracking in
+        order to break a circular dependency. Unlike the other mask
+        types, the reason is the set of packages that the masked package
+        is in a cycle with, rather than a set of parent atoms.
+        """
+        if not missed_updates:
+            return
+
+        self._show_merge_list()
+        msg = [
+            "\nWARNING: One or more updates have been skipped in order "
+            "to break a circular dependency:\n\n"
+        ]
+
+        indent = "  "
+        for pkg, cycle_members in missed_updates:
+            msg.append(str(pkg.slot_atom))
+            if pkg.root_config.settings["ROOT"] != "/":
+                msg.append(f" for {pkg.root}")
+            msg.append("\n\n")
+
+            msg.append(indent)
+            msg.append(f"{pkg} is in a circular dependency with\n")
+            for member in sorted(cycle_members, key=lambda x: x.cpv):
+                msg.append(2 * indent)
+                msg.append(f"{member}\n")
+            msg.append("\n")
+
+        writemsg("".join(msg), noiselevel=-1)
 
     def _show_missed_update_unsatisfied_dep(self, missed_updates):
         if not missed_updates:
@@ -10277,11 +10314,12 @@ class depgraph:
 
                 if unsolved_cycle or not self._dynamic_config._allow_backtracking:
                     # Adjusting || preferences did not help, so try to
-                    # break the cycle with a USE change as a last resort.
+                    # break the cycle with a USE change, and then with
+                    # an older version, as a last resort.
+                    handler = circular_dependency_handler(self, mygraph)
                     if self._dynamic_config._allow_backtracking and (
-                        self._solve_cycle_with_use_changes(
-                            circular_dependency_handler(self, mygraph)
-                        )
+                        self._solve_cycle_with_use_changes(handler)
+                        or self._solve_cycle_with_older_version(handler)
                     ):
                         self._dynamic_config._need_restart = True
                     else:
@@ -10474,6 +10512,102 @@ class depgraph:
 
             return True
 
+        return False
+
+    def _solve_cycle_with_older_version(self, handler):
+        """
+        Try to break a cycle by masking a package that participates in
+        it, so that an older version is selected instead. Only versions
+        that are visible and that do not downgrade an installed package
+        are considered (bug 407351).
+
+        @return: True if a package was masked
+        """
+        cycle = handler.shortest_cycle or ()
+
+        for index, pkg in enumerate(cycle):
+            if not isinstance(pkg, Package):
+                continue
+            # cycle[n] is a child of cycle[n - 1], so the dependency that
+            # pkg has to lose is the next member of the cycle.
+            cycle_child = cycle[(index + 1) % len(cycle)]
+            if pkg.installed or pkg.operation != "merge":
+                continue
+            if pkg in self._dynamic_config._runtime_pkg_mask:
+                continue
+            if pkg in self._dynamic_config._set_nodes:
+                # Masking a package that an argument selected would make
+                # the request unsatisfiable rather than solving anything.
+                continue
+
+            vardb = self._frozen_config.roots[pkg.root].trees["vartree"].dbapi
+            installed = vardb.match_pkgs(pkg.slot_atom)
+
+            usable = False
+            for candidate in self._iter_match_pkgs(
+                pkg.root_config, pkg.type_name, Atom(pkg.cp)
+            ):
+                if candidate.installed or candidate.cpv >= pkg.cpv:
+                    continue
+                if not self._pkg_visibility_check(candidate):
+                    continue
+                if installed and candidate.cpv < installed[-1].cpv:
+                    # Do not downgrade below what is installed.
+                    continue
+                if self._depends_on(candidate, cycle_child):
+                    # The older version has the same dependency, so it
+                    # would recreate the cycle.
+                    continue
+                if not all(
+                    atom.match(candidate)
+                    for _parent, atom in self._dynamic_config._parent_atoms.get(pkg, ())
+                    if atom.package and not atom.blocker
+                ):
+                    # Some parent requires the version that would be
+                    # masked, so masking it solves nothing.
+                    continue
+                usable = True
+                break
+
+            if not usable:
+                continue
+
+            backtrack_infos = self._dynamic_config._backtrack_infos
+            backtrack_infos.setdefault("config", {}).setdefault(
+                "circular_pkg_mask", {}
+            )[pkg] = frozenset(
+                x for x in cycle if isinstance(x, Package) and x is not pkg
+            )
+            return True
+
+        return False
+
+    def _depends_on(self, pkg, child):
+        """
+        Return True if a build time or runtime dependency of pkg matches
+        child. Post-merge dependencies are not considered, since the
+        merge order ignores them anyway.
+        """
+        for key in Package._buildtime_keys + ("RDEPEND",):
+            dep = pkg._metadata[key]
+            if not dep:
+                continue
+            try:
+                atoms = portage.dep.use_reduce(
+                    dep,
+                    uselist=self._pkg_use_enabled(pkg),
+                    is_valid_flag=pkg.iuse.is_valid_flag,
+                    flat=True,
+                    token_class=Atom,
+                    eapi=pkg.eapi,
+                )
+            except portage.exception.InvalidDependString:
+                return True
+            for atom in atoms:
+                if not isinstance(atom, Atom) or atom.blocker:
+                    continue
+                if atom.match(child):
+                    return True
         return False
 
     def _user_requested_use_flags(self, pkg):
