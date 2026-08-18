@@ -572,10 +572,13 @@ the dependency closing the cycle disabled, and then with the requested
 USE flags. For example, \fImedia\-libs/freetype\fR is built with
 USE="\-harfbuzz", then \fImedia\-libs/harfbuzz\fR is built, and finally
 \fImedia\-libs/freetype\fR is built again as requested. The temporary
-build is marked as such in the merge list. Defaults to \fIn\fR. Note
-that if the second build does not happen, because it fails or because
-the operation is interrupted, the package is left installed with the
-reduced USE configuration until it is rebuilt.
+build is marked as such in the merge list. Defaults to \fIn\fR.
+.br
+\fB\-\-resume\fR is not available for such a run, because the resume list
+does not record USE flags; a new dependency calculation is done instead.
+Note that if the second build does not happen, because it fails or
+because the operation is interrupted, the package is left installed with
+the reduced USE configuration until it is rebuilt.
 .TP
 .BR \-\-debug ", " \-d
 Tells emerge to run the emerge command in \fB\-\-debug\fR mode.  In this mode

@@ -1781,7 +1781,14 @@ class Scheduler(PollScheduler):
         # --resume still works after being interrupted
         # by reboot, sigkill or similar.
         mtimedb = self._mtimedb
-        mtimedb["resume"]["mergelist"].remove(list(pkg))
+        if "resume" not in mtimedb:
+            # No resume list was saved, for example because the merge
+            # list contains a cycle-breaking build.
+            return
+        try:
+            mtimedb["resume"]["mergelist"].remove(list(pkg))
+        except ValueError:
+            pass
         if not mtimedb["resume"]["mergelist"]:
             del mtimedb["resume"]
         mtimedb.commit()
@@ -2618,6 +2625,18 @@ class Scheduler(PollScheduler):
         a non-essential package with a broken digest.
         """
         mtimedb = self._mtimedb
+
+        if any(isinstance(x, Package) and x.cycle_pass for x in self._mergelist):
+            # The resume list does not record USE flags, so a temporary
+            # cycle-breaking build would be repeated with the requested
+            # USE flags, recreating the cycle. Force a new dependency
+            # calculation instead, which schedules the two builds again.
+            # The backup has to go as well, since --resume falls back to
+            # it when there is no resume list.
+            for k in ("resume", "resume_backup"):
+                mtimedb.pop(k, None)
+            mtimedb.commit()
+            return
 
         mtimedb["resume"] = {}
         # Stored as a dict starting with portage-2.1.6_rc1, and supported
