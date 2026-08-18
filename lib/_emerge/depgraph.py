@@ -317,6 +317,9 @@ class _frozen_depgraph_config:
         # All Package instances
         self._pkg_cache = {}
         self._highest_license_masked = {}
+        # Whether the --cycle-break limit has already been reported, so
+        # that backtracking does not repeat the message.
+        self._cycle_break_limit_shown = False
         # We can't know that an soname dep is unsatisfied if there are
         # any unbuilt ebuilds in the graph, since unbuilt ebuilds have
         # no soname data. Therefore, only enable soname dependency
@@ -687,6 +690,14 @@ class _dynamic_depgraph_config:
         # Packages that --depclean cannot remove because they are kept
         # alive by a dependency cycle, mapped to the cycle members.
         self._depclean_cycle_suggestions = {}
+        # Transient cycle-breaking builds, mapped to the package that
+        # they are built ahead of.
+        self._cycle_break_pkgs = {}
+        # The handler that the cycle solving attempts were based on,
+        # kept so that _show_circular_deps() does not have to compute it
+        # again. Unlike _circular_dependency_handler, this does not mean
+        # that a cycle is going to be reported.
+        self._cycle_solution_handler = None
         self._dep_stack = []
         self._dep_disjunctive_stack = []
         self._unsatisfied_deps = []
@@ -703,6 +714,7 @@ class _dynamic_depgraph_config:
         self.ignored_binaries = {}
 
         self._circular_dependency = backtrack_parameters.circular_dependency
+        self._cycle_break = backtrack_parameters.cycle_break
         self._needed_unstable_keywords = backtrack_parameters.needed_unstable_keywords
         self._needed_p_mask_changes = backtrack_parameters.needed_p_mask_changes
         self._needed_license_changes = backtrack_parameters.needed_license_changes
@@ -835,6 +847,10 @@ class depgraph:
     # user arguments (or their deep dependencies). Such nodes are pulled
     # in by the _complete_graph method.
     _UNREACHABLE_DEPTH = object()
+
+    # Maximum number of packages that may be built twice in a single
+    # session in order to break circular dependencies.
+    _max_cycle_breaks = 3
 
     pkg_tree_map = RootConfig.pkg_tree_map
 
@@ -9485,6 +9501,9 @@ class depgraph:
     def _serialize_tasks(self):
         debug = "--debug" in self._frozen_config.myopts
 
+        if self._dynamic_config._cycle_break:
+            self._apply_cycle_break()
+
         if debug:
             writemsg("\ndigraph:\n\n", noiselevel=-1)
             self._dynamic_config.digraph.debug_print()
@@ -10313,14 +10332,23 @@ class depgraph:
                             )
 
                 if unsolved_cycle or not self._dynamic_config._allow_backtracking:
-                    # Adjusting || preferences did not help, so try to
-                    # break the cycle with a USE change, and then with
-                    # an older version, as a last resort.
-                    handler = circular_dependency_handler(self, mygraph)
-                    if self._dynamic_config._allow_backtracking and (
-                        self._solve_cycle_with_use_changes(handler)
-                        or self._solve_cycle_with_older_version(handler)
-                    ):
+                    solved = False
+                    if self._dynamic_config._allow_backtracking:
+                        # Adjusting || preferences did not help, so try
+                        # to break the cycle with a USE change, then with
+                        # an older version, and finally with a two pass
+                        # build, as a last resort. The handler is kept
+                        # for _show_circular_deps(), since computing it
+                        # again would repeat the search for USE changes.
+                        handler = circular_dependency_handler(self, mygraph)
+                        self._dynamic_config._cycle_solution_handler = handler
+                        solved = (
+                            self._solve_cycle_with_use_changes(handler)
+                            or self._solve_cycle_with_older_version(handler)
+                            or self._schedule_cycle_break(handler)
+                        )
+
+                    if solved:
                         self._dynamic_config._need_restart = True
                     else:
                         self._dynamic_config._circular_deps_for_display = mygraph
@@ -10460,6 +10488,21 @@ class depgraph:
 
         return retlist, scheduler_graph
 
+    @staticmethod
+    def _cycle_solution_sort_key(candidate):
+        """
+        Prefer the smallest solution, then the one that disables the
+        fewest flags, and finally sort by name so that the result does
+        not depend on set iteration order.
+        """
+        pkg, solution = candidate
+        return (
+            len(solution),
+            sum(1 for _flag, state in solution if state),
+            tuple(sorted(solution)),
+            pkg.cpv,
+        )
+
     def _solve_cycle_with_use_changes(self, handler):
         """
         Try to break a cycle by changing USE flags that the user has not
@@ -10482,24 +10525,10 @@ class depgraph:
                     # The user asked for this flag, so report the cycle
                     # instead of silently overriding the request.
                     continue
-                # Prefer the smallest solution, then the one that
-                # disables the fewest flags, and finally sort by name so
-                # that the result does not depend on set iteration order.
-                candidates.append(
-                    (
-                        (
-                            len(solution),
-                            sum(1 for flag, state in solution if state),
-                            tuple(sorted(solution)),
-                            pkg.cpv,
-                        ),
-                        pkg,
-                        solution,
-                    )
-                )
-        candidates.sort(key=lambda x: x[0])
+                candidates.append((pkg, solution))
+        candidates.sort(key=self._cycle_solution_sort_key)
 
-        for _key, pkg, solution in candidates:
+        for pkg, solution in candidates:
             target_use = dict(solution)
             old_use = self._pkg_use_enabled(pkg)
             new_use = self._pkg_use_enabled(pkg, target_use)
@@ -10610,6 +10639,166 @@ class depgraph:
                     return True
         return False
 
+    def _cycle_break_enabled(self):
+        return self._frozen_config.myopts.get("--cycle-break") == "y"
+
+    def _schedule_cycle_break(self, handler):
+        """
+        Record a package that should be built twice in order to break a
+        cycle: once with a reduced USE configuration, and once with the
+        requested configuration. The graph is rebuilt from scratch after
+        this, and _apply_cycle_break() performs the transformation.
+
+        @return: True if a two pass build was scheduled
+        """
+        if not self._cycle_break_enabled():
+            return False
+
+        candidates = []
+        for pkg, solutions in handler.parent_solutions.items():
+            if pkg.installed or pkg.built or pkg.operation != "merge":
+                continue
+            if pkg in self._dynamic_config._cycle_break:
+                continue
+            for solution in solutions:
+                candidates.append((pkg, solution))
+
+        if not candidates:
+            return False
+
+        if len(self._dynamic_config._cycle_break) >= self._max_cycle_breaks:
+            if not self._frozen_config._cycle_break_limit_shown:
+                self._frozen_config._cycle_break_limit_shown = True
+                writemsg(
+                    "!!! Refusing to build more than "
+                    f"{self._max_cycle_breaks} packages twice in order to "
+                    "break circular dependencies.\n",
+                    noiselevel=-1,
+                )
+            return False
+
+        pkg, solution = min(candidates, key=self._cycle_solution_sort_key)
+
+        backtrack_infos = self._dynamic_config._backtrack_infos
+        backtrack_infos.setdefault("config", {})
+        backtrack_infos["config"].setdefault("cycle_break", {})[pkg] = solution
+        return True
+
+    def _apply_cycle_break(self):
+        """
+        For every package that has been scheduled for a two pass build,
+        add a transient instance with the reduced USE configuration, and
+        redirect the dependencies that close the cycle to it. The result
+        is freetype[-harfbuzz] -> harfbuzz -> freetype[harfbuzz] instead
+        of a cycle.
+        """
+        graph = self._dynamic_config.digraph
+        for pkg, solution in self._dynamic_config._cycle_break.items():
+            if pkg not in graph:
+                continue
+
+            use_changes = dict(solution)
+            transient = self._cycle_break_pkg(pkg, use_changes)
+            if transient in graph:
+                # _serialize_tasks() is retried for a graph that has
+                # already been transformed, and doing it again would
+                # find nothing left to redirect and undo it.
+                continue
+
+            new_use = set(self._pkg_use_enabled(pkg))
+            for flag, state in solution:
+                if state:
+                    new_use.add(flag)
+                else:
+                    new_use.discard(flag)
+
+            # Everything that pkg still depends on with the reduced USE
+            # configuration has to be merged before the transient build.
+            dropped = self._dropped_children(pkg, new_use)
+            for child in graph.child_nodes(pkg):
+                if child in dropped:
+                    continue
+                for priority in graph.nodes[pkg][0][child]:
+                    graph.add(child, transient, priority=priority)
+
+            # Redirect the dependencies that close the cycle, which are
+            # the parents of pkg that pkg itself depends on.
+            descendants = {node for _parent, node in graph.bfs(pkg)}
+            redirected = False
+            for parent in graph.parent_nodes(pkg):
+                if parent not in descendants:
+                    continue
+                priorities = list(graph.nodes[parent][0][pkg])
+                graph.remove_edge(pkg, parent)
+                for priority in priorities:
+                    graph.add(transient, parent, priority=priority)
+                redirected = True
+
+            if not redirected:
+                # The cycle is gone, so the extra build is not needed.
+                graph.remove(transient)
+                continue
+
+            self._dynamic_config._cycle_break_pkgs[transient] = pkg
+
+    def _cycle_break_pkg(self, pkg, use_changes):
+        """
+        Return a transient instance of pkg with the given USE changes
+        applied.
+        """
+        return Package(
+            built=False,
+            cpv=pkg.cpv,
+            cycle_pass=1,
+            cycle_use_changes=use_changes,
+            depth=pkg.depth,
+            installed=False,
+            metadata=pkg._raw_metadata,
+            operation="merge",
+            root_config=pkg.root_config,
+            type_name=pkg.type_name,
+        )
+
+    def _dropped_children(self, pkg, new_use):
+        """
+        Return the children of pkg in the dependency graph that are no
+        longer required when pkg is built with new_use.
+        """
+        graph = self._dynamic_config.digraph
+        remaining = []
+        for key in Package._dep_keys:
+            dep = pkg._metadata[key]
+            if not dep:
+                continue
+            try:
+                atoms = portage.dep.use_reduce(
+                    dep,
+                    uselist=new_use,
+                    is_valid_flag=pkg.iuse.is_valid_flag,
+                    flat=True,
+                    token_class=Atom,
+                    eapi=pkg.eapi,
+                )
+            except portage.exception.InvalidDependString:
+                return set()
+            remaining.extend(
+                atom for atom in atoms if isinstance(atom, Atom) and not atom.blocker
+            )
+
+        dropped = set()
+        for child in graph.child_nodes(pkg):
+            if not isinstance(child, Package):
+                continue
+            if not any(
+                parent is pkg
+                for parent, atom in self._dynamic_config._parent_atoms.get(child, ())
+            ):
+                # Not pulled in by pkg itself, so it is not ours to drop.
+                continue
+            if not any(atom.match(child) for atom in remaining):
+                dropped.add(child)
+        return dropped
+
     def _user_requested_use_flags(self, pkg):
         """
         Return the USE flags that the user has explicitly set for pkg,
@@ -10625,10 +10814,10 @@ class depgraph:
         return flags
 
     def _show_circular_deps(self, mygraph):
-        self._dynamic_config._circular_dependency_handler = circular_dependency_handler(
-            self, mygraph
-        )
-        handler = self._dynamic_config._circular_dependency_handler
+        handler = self._dynamic_config._cycle_solution_handler
+        if handler is None or handler.graph is not mygraph:
+            handler = circular_dependency_handler(self, mygraph)
+        self._dynamic_config._circular_dependency_handler = handler
 
         if self._frozen_config.myopts.get("--circular-deps-report") == "json":
             self._show_circular_deps_json(handler)

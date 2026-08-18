@@ -565,6 +565,18 @@ version will change (upgrade or downgrade). This option is enabled by default.
 .BR \-\-config\-root=DIR
 Set the \fBPORTAGE_CONFIGROOT\fR environment variable.
 .TP
+.BR "\-\-cycle\-break [ y | n ]"
+When a circular dependency cannot be solved in any other way, build one
+of the packages involved twice: first with the USE flags that pull in
+the dependency closing the cycle disabled, and then with the requested
+USE flags. For example, \fImedia\-libs/freetype\fR is built with
+USE="\-harfbuzz", then \fImedia\-libs/harfbuzz\fR is built, and finally
+\fImedia\-libs/freetype\fR is built again as requested. The temporary
+build is marked as such in the merge list. Defaults to \fIn\fR. Note
+that if the second build does not happen, because it fails or because
+the operation is interrupted, the package is left installed with the
+reduced USE configuration until it is rebuilt.
+.TP
 .BR \-\-debug ", " \-d
 Tells emerge to run the emerge command in \fB\-\-debug\fR mode.  In this mode
 the bash build environment will run with the \-x option, causing it to output

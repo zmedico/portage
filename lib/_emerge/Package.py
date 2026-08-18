@@ -649,6 +649,12 @@ class Package(Task):
         # "buildpkg-live" is a FEATURE that is enabled by default.
         # To not build binary cache for live pkgs, we disable it by
         # specifying FEATURES="-buildpkg-live"
+        if self.cycle_pass:
+            # A temporary build with a reduced USE configuration, which
+            # only exists in order to break a circular dependency. It
+            # does not correspond to any requested configuration, so it
+            # must not be reused as a binary package.
+            return False
         features = self._get_pkgsettings().features
         return (
             ("buildpkg-live" in features or "live" not in self.properties)

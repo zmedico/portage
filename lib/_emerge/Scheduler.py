@@ -229,6 +229,10 @@ class Scheduler(PollScheduler):
         self._deep_system_deps = set()
         # Packages that are part of a dependency cycle.
         self._cyclic_nodes = set()
+        # cpvs that have a temporary cycle-breaking build in the merge
+        # list, and therefore have to be rebuilt before the merge list
+        # is complete.
+        self._cycle_break_pkgs = set()
 
         # Holds packages to merge which will satisfy currently unsatisfied
         # deep runtime dependencies of system packages. If this is not empty
@@ -565,6 +569,7 @@ class Scheduler(PollScheduler):
             self._world_atoms = None
             self._deep_system_deps.clear()
             self._cyclic_nodes.clear()
+            self._cycle_break_pkgs.clear()
             return
 
         self._graph_config = graph_config
@@ -578,6 +583,11 @@ class Scheduler(PollScheduler):
         self._world_atoms = {}
         for pkg in self._mergelist:
             if getattr(pkg, "operation", None) != "merge":
+                continue
+            if pkg.cycle_pass:
+                # A temporary build that is replaced later in this same
+                # merge list, so it must not end up in the world file.
+                self._cycle_break_pkgs.add(pkg.cpv)
                 continue
             atom = create_world_atom(
                 pkg, self._args_set, pkg.root_config, before_install=True
