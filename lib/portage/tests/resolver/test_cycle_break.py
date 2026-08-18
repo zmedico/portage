@@ -62,3 +62,65 @@ class CycleBreakTestCase(TestCase):
                 self.assertEqual(test_case.test_success, True, test_case.fail_msg)
         finally:
             playground.cleanup()
+
+    def testRustSystemBootstrap(self):
+        """
+        dev-lang/rust with USE=system-bootstrap needs an already
+        installed rust to build. Building it once without the flag
+        provides one (bug 888177).
+        """
+        ebuilds = {
+            "dev-lang/rust-2": {
+                "BDEPEND": "system-bootstrap? ( dev-lang/rust )",
+                "IUSE": "+system-bootstrap",
+                "EAPI": "8",
+            },
+        }
+
+        user_config = {"make.conf": ('USE="system-bootstrap"',)}
+
+        test_cases = (
+            ResolverPlaygroundTestCase(
+                ["dev-lang/rust"],
+                options={"--cycle-break": "y"},
+                success=True,
+                mergelist=[
+                    "[cycle-break]dev-lang/rust-2",
+                    "dev-lang/rust-2",
+                ],
+            ),
+        )
+
+        playground = ResolverPlayground(ebuilds=ebuilds, user_config=user_config)
+        try:
+            for test_case in test_cases:
+                playground.run_TestCase(test_case)
+                self.assertEqual(test_case.test_success, True, test_case.fail_msg)
+        finally:
+            playground.cleanup()
+
+    def testNoUnnecessaryCycleBreak(self):
+        """
+        --cycle-break=y does not change anything when there is no cycle.
+        """
+        ebuilds = {
+            "dev-libs/A-1": {"DEPEND": "dev-libs/B", "EAPI": "8"},
+            "dev-libs/B-1": {"EAPI": "8"},
+        }
+
+        test_cases = (
+            ResolverPlaygroundTestCase(
+                ["dev-libs/A"],
+                options={"--cycle-break": "y"},
+                success=True,
+                mergelist=["dev-libs/B-1", "dev-libs/A-1"],
+            ),
+        )
+
+        playground = ResolverPlayground(ebuilds=ebuilds)
+        try:
+            for test_case in test_cases:
+                playground.run_TestCase(test_case)
+                self.assertEqual(test_case.test_success, True, test_case.fail_msg)
+        finally:
+            playground.cleanup()
