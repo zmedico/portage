@@ -11,6 +11,7 @@ py.install_sources(
         'test_manifest.py',
         'test_mtimedb.py',
         'test_normalizedPath.py',
+        'test_pending_rebuilds.py',
         'test_shelve.py',
         'test_socks5.py',
         'test_stackDictList.py',

@@ -30,6 +30,10 @@ from portage.package.ebuild.digestgen import digestgen
 from portage.package.ebuild.doebuild import _check_temp_dir, _prepare_self_update
 from portage.package.ebuild.prepare_build_dirs import prepare_build_dirs
 from portage.util import ensure_dirs, writemsg, writemsg_level
+from portage.util._pending_rebuilds import (
+    add_pending_rebuild,
+    remove_pending_rebuild,
+)
 from portage.util._async.SchedulerInterface import SchedulerInterface
 from portage.util.cgroup import DEFAULT_CGROUP_ROOT, CgroupManager
 from portage.util.futures import asyncio
@@ -1843,7 +1847,25 @@ class Scheduler(PollScheduler):
     def _extract_exit(self, build):
         self._build_exit(build)
 
+    def _record_pending_rebuild(self, pkg):
+        """
+        Keep track of packages that have been installed with a reduced
+        USE configuration in order to break a circular dependency, so
+        that the user is told about them if the rebuild does not happen.
+        """
+        if pkg.operation != "merge" or pkg.installed:
+            return
+        eroot = pkg.root_config.settings["EROOT"]
+        if pkg.cycle_pass:
+            add_pending_rebuild(eroot, pkg)
+        else:
+            # Any merge of the package with the requested configuration
+            # settles the debt, including a newer version from a later
+            # emerge that does not break a cycle itself.
+            remove_pending_rebuild(eroot, pkg)
+
     def _task_complete(self, pkg):
+        self._record_pending_rebuild(pkg)
         self._completed_tasks.add(pkg)
         self._unsatisfied_system_deps.discard(pkg)
         self._choose_pkg_return_early = False

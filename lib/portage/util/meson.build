@@ -36,6 +36,7 @@ py.install_sources(
         '_get_vm_info.py',
         '_info_files.py',
         '_path.py',
+        '_pending_rebuilds.py',
         '_pty.py',
         '_urlopen.py',
         '_xattr.py',

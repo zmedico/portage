@@ -51,6 +51,7 @@ PRIVATE_PATH = "var/lib/portage"
 WORLD_FILE = f"{PRIVATE_PATH}/world"
 WORLD_SETS_FILE = f"{PRIVATE_PATH}/world_sets"
 CONFIG_MEMORY_FILE = f"{PRIVATE_PATH}/config"
+PENDING_REBUILDS_FILE = f"{PRIVATE_PATH}/pending_rebuilds"
 REPO_REVISIONS = f"{PRIVATE_PATH}/repo_revisions"
 NEWS_LIB_PATH = "var/lib/gentoo"
 # Runtime (volatile) state directory where a running emerge publishes its

@@ -11,6 +11,7 @@ from portage.news import count_unread_news, display_news_notifications
 from portage.output import colorize
 from portage.util._dyn_libs.display_preserved_libs import display_preserved_libs
 from portage.util._info_files import chk_updated_info_files
+from portage.util._pending_rebuilds import display_pending_rebuilds
 from portage.util.portage_lru_cache import show_lru_cache_info
 
 from ._flush_elog_mod_echo import _flush_elog_mod_echo
@@ -149,6 +150,8 @@ def post_emerge(myaction, myopts, myfiles, target_root, trees, mtimedb, retval):
                 + colorize("GOOD", "emerge @preserved-rebuild")
                 + " to rebuild packages using these libraries"
             )
+
+    display_pending_rebuilds(settings["EROOT"])
 
     chk_updated_cfg_files(settings["EROOT"], config_protect)
 
