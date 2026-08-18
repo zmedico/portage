@@ -11,14 +11,15 @@ from portage.tests import TestCase
 
 class PackageTrackerTestCase(TestCase):
     FakePackage = collections.namedtuple(
-        "FakePackage", ["root", "cp", "cpv", "slot", "slot_atom", "version", "repo"]
+        "FakePackage",
+        ["root", "cp", "cpv", "slot", "slot_atom", "version", "repo", "cycle_pass"],
     )
 
     FakeConflict = collections.namedtuple(
         "FakeConflict", ["description", "root", "pkgs"]
     )
 
-    def make_pkg(self, root, atom, repo="test_repo"):
+    def make_pkg(self, root, atom, repo="test_repo", cycle_pass=0):
         atom = Atom(atom)
         slot_atom = Atom(f"{atom.cp}:{atom.slot}")
         slot = atom.slot
@@ -31,6 +32,7 @@ class PackageTrackerTestCase(TestCase):
             slot_atom=slot_atom,
             version=atom.version,
             repo=repo,
+            cycle_pass=cycle_pass,
         )
 
     def make_conflict(self, description, root, pkgs):
@@ -268,3 +270,23 @@ class PackageTrackerTestCase(TestCase):
             ],
             slot_conflicts_only=True,
         )
+
+    def test_cycle_pass(self):
+        """
+        Transient builds that only exist in order to break a circular
+        dependency are not tracked, so that they neither satisfy
+        dependencies nor conflict with the final instance.
+        """
+        p = PackageTracker()
+        x1 = self.make_pkg("/", "=dev-libs/X-1:0")
+        x1_cycle = self.make_pkg("/", "=dev-libs/X-1:0", cycle_pass=1)
+
+        p.add_pkg(x1_cycle)
+        self.assertEqual(list(p.all_pkgs("/")), [])
+
+        # Removing one is a no-op rather than a KeyError.
+        p.remove_pkg(x1_cycle)
+
+        p.add_pkg(x1)
+        self.assertEqual(list(p.all_pkgs("/")), [x1])
+        self.assertEqual(list(p.conflicts()), [])

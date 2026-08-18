@@ -67,6 +67,8 @@ class Package(Task):
         "sub_slot",
         "slot_atom",
         "version",
+        "cycle_pass",
+        "cycle_use_changes",
     ) + (
         "_invalid",
         "_masks",
@@ -187,6 +189,7 @@ class Package(Task):
             repo_name=self.cpv.repo,
             root_config=self.root_config,
             type_name=self.type_name,
+            cycle_pass=self.cycle_pass,
         )
         self._hash_value = hash(self._hash_key)
 
@@ -277,6 +280,7 @@ class Package(Task):
         repo_name=None,
         root_config=None,
         type_name=None,
+        cycle_pass=None,
         **kwargs,
     ):
         if operation is None:
@@ -316,6 +320,12 @@ class Package(Task):
             # when it comes to hashing, because there can only be one cpv.
             # So overwrite the repo_key with type_name.
             elements.append(type_name)
+
+        if cycle_pass:
+            # A package that is merged more than once in the same
+            # session, in order to break a circular dependency, needs to
+            # be distinguishable from the final instance.
+            elements.append(cycle_pass)
 
         return tuple(elements)
 

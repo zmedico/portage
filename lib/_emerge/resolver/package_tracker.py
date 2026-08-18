@@ -124,6 +124,13 @@ class PackageTracker:
         """
         Add a new package to the tracker. Records conflicts as necessary.
         """
+        if pkg.cycle_pass:
+            # A transient build that only exists in order to break a
+            # circular dependency. It does not satisfy dependencies and
+            # it cannot conflict with anything, since the final instance
+            # replaces it later in the same merge list.
+            return
+
         cp_key = pkg.root, pkg.cp
 
         if any(other is pkg for other in self._cp_pkg_map[cp_key]):
@@ -178,6 +185,10 @@ class PackageTracker:
         Removes the package from the tracker.
         Raises KeyError if it isn't present.
         """
+        if pkg.cycle_pass:
+            # Never added by add_pkg(), so there is nothing to remove.
+            return
+
         cp_key = pkg.root, pkg.cp
         try:
             self._cp_pkg_map.get(cp_key, []).remove(pkg)
