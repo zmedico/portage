@@ -49,6 +49,19 @@ Features:
   now names the whole cycle when a package cannot be cleaned because of one
   (bug #346351).
 
+* emerge: Solve circular dependencies automatically where possible. A cycle
+  that can be broken by changing a USE flag which the user has not requested
+  is now solved through the existing autounmask mechanism (bug #175808), or
+  by selecting an older version whose dependencies do not close the cycle
+  (bug #407351). With the new --cycle-break=y option, a package can be built
+  twice in one session, first with a reduced USE configuration, which solves
+  the common media-libs/freetype and media-libs/harfbuzz case and bootstrap
+  cycles such as dev-lang/rust with USE=system-bootstrap (bug #888177);
+  packages left waiting for their second build are recorded in
+  ${EROOT}/var/lib/portage/pending_rebuilds and reported after every emerge.
+  Packages that are merged before one of their runtime dependencies, because
+  the cycle can only be broken that way, are now reported (bug #647824).
+
 portage-3.0.82.2 (2026-08-28)
 ----------------
 
