@@ -121,8 +121,8 @@ class BinpkgFetcher(CompositeTask):
                     fetcher.sync_timestamp()
             else:
                 if _want_userfetch(self.pkg.root_config.settings):
-                    portage.util.ensure_dirs(
-                        os.path.dirname(self.pkg_path), uid=portage_gid, gid=portage_gid
+                    self.pkg.root_config.trees["bintree"]._ensure_dir(
+                        os.path.dirname(self.pkg_path)
                     )
 
                 fetcher.start()
