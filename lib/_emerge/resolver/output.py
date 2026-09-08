@@ -331,11 +331,6 @@ class Display:
                     self.counters.totalsize += mysize
             self.verboseadd += localized_size(mysize)
 
-        if pkg.cycle_pass:
-            self.verboseadd += colorize(
-                "WARN", " (temporary build, to break a circular dependency)"
-            )
-
         if self.quiet_repo_display:
             # overlay verbose
             # assign index for a previous version in the same slot

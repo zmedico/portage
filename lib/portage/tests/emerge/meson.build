@@ -4,7 +4,6 @@ py.install_sources(
         'test_binpkg_fetch.py',
         'test_buildpkg.py',
         'test_config_protect.py',
-        'test_cycle_break.py',
         'test_emerge_blocker_file_collision.py',
         'test_emerge_slot_abi.py',
         'test_global_updates.py',

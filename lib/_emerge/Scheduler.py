@@ -30,10 +30,6 @@ from portage.package.ebuild.digestgen import digestgen
 from portage.package.ebuild.doebuild import _check_temp_dir, _prepare_self_update
 from portage.package.ebuild.prepare_build_dirs import prepare_build_dirs
 from portage.util import ensure_dirs, writemsg, writemsg_level
-from portage.util._pending_rebuilds import (
-    add_pending_rebuild,
-    remove_pending_rebuild,
-)
 from portage.util._async.SchedulerInterface import SchedulerInterface
 from portage.util.cgroup import DEFAULT_CGROUP_ROOT, CgroupManager
 from portage.util.futures import asyncio
@@ -233,10 +229,6 @@ class Scheduler(PollScheduler):
         self._deep_system_deps = set()
         # Packages that are part of a dependency cycle.
         self._cyclic_nodes = set()
-        # cpvs that have a temporary cycle-breaking build in the merge
-        # list, and therefore have to be rebuilt before the merge list
-        # is complete.
-        self._cycle_break_pkgs = set()
 
         # Holds packages to merge which will satisfy currently unsatisfied
         # deep runtime dependencies of system packages. If this is not empty
@@ -573,7 +565,6 @@ class Scheduler(PollScheduler):
             self._world_atoms = None
             self._deep_system_deps.clear()
             self._cyclic_nodes.clear()
-            self._cycle_break_pkgs.clear()
             return
 
         self._graph_config = graph_config
@@ -587,11 +578,6 @@ class Scheduler(PollScheduler):
         self._world_atoms = {}
         for pkg in self._mergelist:
             if getattr(pkg, "operation", None) != "merge":
-                continue
-            if pkg.cycle_pass:
-                # A temporary build that is replaced later in this same
-                # merge list, so it must not end up in the world file.
-                self._cycle_break_pkgs.add(pkg.cpv)
                 continue
             atom = create_world_atom(
                 pkg, self._args_set, pkg.root_config, before_install=True
@@ -1781,14 +1767,7 @@ class Scheduler(PollScheduler):
         # --resume still works after being interrupted
         # by reboot, sigkill or similar.
         mtimedb = self._mtimedb
-        if "resume" not in mtimedb:
-            # No resume list was saved, for example because the merge
-            # list contains a cycle-breaking build.
-            return
-        try:
-            mtimedb["resume"]["mergelist"].remove(list(pkg))
-        except ValueError:
-            pass
+        mtimedb["resume"]["mergelist"].remove(list(pkg))
         if not mtimedb["resume"]["mergelist"]:
             del mtimedb["resume"]
         mtimedb.commit()
@@ -1854,25 +1833,7 @@ class Scheduler(PollScheduler):
     def _extract_exit(self, build):
         self._build_exit(build)
 
-    def _record_pending_rebuild(self, pkg):
-        """
-        Keep track of packages that have been installed with a reduced
-        USE configuration in order to break a circular dependency, so
-        that the user is told about them if the rebuild does not happen.
-        """
-        if pkg.operation != "merge" or pkg.installed:
-            return
-        eroot = pkg.root_config.settings["EROOT"]
-        if pkg.cycle_pass:
-            add_pending_rebuild(eroot, pkg)
-        else:
-            # Any merge of the package with the requested configuration
-            # settles the debt, including a newer version from a later
-            # emerge that does not break a cycle itself.
-            remove_pending_rebuild(eroot, pkg)
-
     def _task_complete(self, pkg):
-        self._record_pending_rebuild(pkg)
         self._completed_tasks.add(pkg)
         self._unsatisfied_system_deps.discard(pkg)
         self._choose_pkg_return_early = False
@@ -2625,18 +2586,6 @@ class Scheduler(PollScheduler):
         a non-essential package with a broken digest.
         """
         mtimedb = self._mtimedb
-
-        if any(isinstance(x, Package) and x.cycle_pass for x in self._mergelist):
-            # The resume list does not record USE flags, so a temporary
-            # cycle-breaking build would be repeated with the requested
-            # USE flags, recreating the cycle. Force a new dependency
-            # calculation instead, which schedules the two builds again.
-            # The backup has to go as well, since --resume falls back to
-            # it when there is no resume list.
-            for k in ("resume", "resume_backup"):
-                mtimedb.pop(k, None)
-            mtimedb.commit()
-            return
 
         mtimedb["resume"] = {}
         # Stored as a dict starting with portage-2.1.6_rc1, and supported

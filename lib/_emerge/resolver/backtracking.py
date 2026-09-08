@@ -7,7 +7,6 @@ import copy
 class BacktrackParameter:
     __slots__ = (
         "circular_dependency",
-        "cycle_break",
         "needed_license_changes",
         "needed_p_mask_changes",
         "needed_unstable_keywords",
@@ -22,7 +21,6 @@ class BacktrackParameter:
 
     def __init__(self):
         self.circular_dependency = {}
-        self.cycle_break = {}
         self.needed_unstable_keywords = set()
         self.needed_p_mask_changes = set()
         self.runtime_pkg_mask = {}
@@ -43,7 +41,6 @@ class BacktrackParameter:
         # Shallow copies are enough here, as we only need to ensure that nobody adds stuff
         # to our sets and dicts. The existing content is immutable.
         result.circular_dependency = copy.copy(self.circular_dependency)
-        result.cycle_break = copy.copy(self.cycle_break)
         result.needed_unstable_keywords = copy.copy(self.needed_unstable_keywords)
         result.needed_p_mask_changes = copy.copy(self.needed_p_mask_changes)
         result.needed_use_config_changes = copy.copy(self.needed_use_config_changes)
@@ -66,7 +63,6 @@ class BacktrackParameter:
     def __eq__(self, other):
         return (
             self.circular_dependency == other.circular_dependency
-            and self.cycle_break == other.cycle_break
             and self.needed_unstable_keywords == other.needed_unstable_keywords
             and self.needed_p_mask_changes == other.needed_p_mask_changes
             and self.runtime_pkg_mask == other.runtime_pkg_mask
@@ -224,17 +220,6 @@ class Backtracker:
                     para.circular_dependency.setdefault(pkg, set()).update(
                         circular_children
                     )
-            elif change == "circular_pkg_mask":
-                # Unlike the other mask reasons, the value is the set of
-                # packages that pkg is in a cycle with, rather than a set
-                # of parent atoms. depgraph._show_missed_update_circular_dep()
-                # is the only consumer.
-                for pkg, cycle_members in data.items():
-                    para.runtime_pkg_mask.setdefault(pkg, {})[
-                        "circular dependency"
-                    ] = cycle_members
-            elif change == "cycle_break":
-                para.cycle_break.update(data)
             elif change == "needed_unstable_keywords":
                 para.needed_unstable_keywords.update(data)
             elif change == "needed_p_mask_changes":
